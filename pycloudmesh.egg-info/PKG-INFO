@@ -1,0 +1,25 @@
+Metadata-Version: 2.1
+Name: pycloudmesh
+Version: 0.1.4
+Summary: A package that exposes the cost API data for AWS, Azure, and GCP
+Home-page: https://github.com/NitheshKG/cloudmesh
+Author: Nithesh
+Author-email: nitheshkg18@gmail.com
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# pycloudmesh
+
+pycloudmesh is a Python package to access multiple finops related apis from AWS, Azure, and GCP.
+
+## Installation
+```bash
+pip install pycloudmesh
+
+

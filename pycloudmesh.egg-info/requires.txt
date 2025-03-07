@@ -1,0 +1,9 @@
+boto3~=1.37.7
+google~=3.0.0
+google-cloud-bigquery~=3.30.0
+google-cloud-recommender~=2.18.1
+protobuf~=5.29.3
+requests~=2.32.3
+pycloudmesh~=0.1.2
+setuptools~=70.1.0
+pandas~=2.2.3

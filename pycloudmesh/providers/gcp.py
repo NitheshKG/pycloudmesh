@@ -1,5 +1,6 @@
 from google.cloud import billing_v1
 from google.cloud import bigquery
+from google.cloud import recommender
 from google.oauth2 import service_account
 
 
@@ -9,6 +10,8 @@ class GCPReservationCost:
         self.credentials = service_account.Credentials.from_service_account_file(credentials_path)
         self.billing_client = billing_v1.CloudBillingClient(credentials=self.credentials)
         self.bigquery_client = bigquery.Client(credentials=self.credentials, project=project_id)
+        self.recommender_client = recommender.RecommenderClient(credentials=self.credentials)
+        self.recommender_id = "google.compute.instanceReservations.Recommender"
 
     def get_billing_account(self):
         """Fetches the billing account ID for the given project"""
@@ -44,3 +47,26 @@ class GCPReservationCost:
         results = query_job.result()
 
         return [dict(row) for row in results]
+
+    def get_reservation_recommendation(self):
+        """Fetches reservation recommendations from the GCP Recommender API."""
+        parent = f"projects/{self.project_id}/locations/global/recommenders/{self.recommender_id}"
+        recommendations = []
+
+        try:
+            response = self.recommender_client.list_recommendations(parent=parent)
+            for recommendation in response:
+                recommendations.append({
+                    "id": recommendation.name,
+                    "description": recommendation.description,
+                    "impact": recommendation.primary_impact.category,
+                    "savings": recommendation.primary_impact.cost_projection.cost
+                    if recommendation.primary_impact.cost_projection else None,
+                    "currency": recommendation.primary_impact.cost_projection.cost.currency_code
+                    if recommendation.primary_impact.cost_projection else None,
+                    "resource": recommendation.content.overview.get("recommendedReservation", {})
+                })
+            return {"recommendations": recommendations}
+
+        except Exception as e:
+            return {"error": f"Failed to fetch reservation recommendations: {str(e)}"}
