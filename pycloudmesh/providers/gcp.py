@@ -1,11 +1,9 @@
 from google.cloud import billing_v1
-from google.cloud import bigquery
-from google.cloud import recommender
 from google.oauth2 import service_account
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-import os
-from google.cloud import recommender_v1, billing_budgets_v1
+from google.cloud import recommender_v1
+from google.cloud.billing.budgets_v1 import BudgetServiceClient, ListBudgetsRequest, CreateBudgetRequest, Budget
 
 
 class GCPReservationCost:
@@ -24,8 +22,8 @@ class GCPReservationCost:
         self.billing_client = billing_v1.CloudBillingClient(credentials=self.credentials)
         self.recommender_client = recommender_v1.RecommenderClient(credentials=self.credentials)
 
+    @staticmethod
     def get_reservation_cost(
-        self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -115,7 +113,7 @@ class GCPBudgetManagement:
         """
         self.project_id = project_id
         self.credentials = service_account.Credentials.from_service_account_file(credentials_path)
-        self.budget_client = billing_budgets_v1.BudgetServiceClient(credentials=self.credentials)
+        self.budget_client = BudgetServiceClient(credentials=self.credentials)
 
     def list_budgets(
         self,
@@ -140,7 +138,7 @@ class GCPBudgetManagement:
         try:
             parent = f"billingAccounts/{billing_account}"
             
-            request = billing_budgets_v1.ListBudgetsRequest(
+            request = ListBudgetsRequest(
                 parent=parent,
                 page_size=max_results or 50
             )
@@ -198,31 +196,31 @@ class GCPBudgetManagement:
         try:
             parent = f"billingAccounts/{billing_account}"
             
-            budget = billing_budgets_v1.Budget(
+            budget = Budget(
                 display_name=budget_name,
-                budget_filter=billing_budgets_v1.Filter(
+                budget_filter=Budget.Filter(
                     projects=[f"projects/{self.project_id}"]
                 ),
-                amount=billing_budgets_v1.BudgetAmount(
-                    specified_amount=billing_budgets_v1.Money(
+                amount=Budget.BudgetAmount(
+                    specified_amount=Budget.BudgetAmount.Money(
                         currency_code=currency_code,
                         units=str(int(amount)),
                         nanos=int((amount % 1) * 1e9)
                     )
                 ),
                 threshold_rules=[
-                    billing_budgets_v1.ThresholdRule(
+                    Budget.ThresholdRule(
                         threshold_percent=0.5,
-                        spend_basis=billing_budgets_v1.ThresholdRule.SpendBasis.CURRENT_SPEND
+                        spend_basis=Budget.ThresholdRule.SpendBasis.CURRENT_SPEND
                     ),
-                    billing_budgets_v1.ThresholdRule(
+                    Budget.ThresholdRule(
                         threshold_percent=0.9,
-                        spend_basis=billing_budgets_v1.ThresholdRule.SpendBasis.CURRENT_SPEND
+                        spend_basis=Budget.ThresholdRule.SpendBasis.CURRENT_SPEND
                     )
                 ]
             )
             
-            request = billing_budgets_v1.CreateBudgetRequest(
+            request = CreateBudgetRequest(
                 parent=parent,
                 budget=budget
             )

@@ -53,9 +53,7 @@ azure = azure_client("your_subscription_id", "your_token")
 
 # Get cost analysis
 analysis = azure.get_cost_analysis(
-    start_date="2024-01-01",
-    end_date="2024-01-31",
-    dimensions=["ResourceType", "ResourceLocation"]
+    dimensions=["SERVICE", "REGION"]
 )
 
 # Get advisor recommendations
@@ -74,26 +72,410 @@ budgets = gcp.list_budgets(billing_account="your_billing_account")
 ## 📊 Comprehensive FinOps Features
 
 ### 1. Cost Management
+
+#### AWS Cost Management Methods
+
+PyCloudMesh provides four distinct AWS cost management methods, each serving different purposes:
+
+##### 1.1 `get_cost_data` - Raw Cost Data
+Fetches raw cost and usage data from AWS Cost Explorer without any processing.
+
 ```python
-# Get detailed cost data
-costs = client.get_cost_data(
+# Get raw cost data
+cost_data = aws.get_cost_data(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    granularity="DAILY",
+    group_by=[{"Type": "DIMENSION", "Key": "SERVICE"}, {"Type": "DIMENSION", "Key": "REGION"}]
+)
+
+# Example output structure:
+[
+    {
+        "TimePeriod": {"Start": "2024-01-01", "End": "2024-01-02"},
+        "Groups": [
+            {
+                "Keys": ["AmazonEC2", "us-east-1"],
+                "Metrics": {"UnblendedCost": {"Amount": "1.23", "Unit": "USD"}}
+            }
+        ],
+        "Total": {"UnblendedCost": {"Amount": "1.68", "Unit": "USD"}},
+        "Estimated": False
+    }
+    # ... more periods
+]
+```
+
+**Use case:** Custom reporting, data export, when you need raw AWS data.
+
+##### 1.2 `get_cost_analysis` - Cost Analysis with Insights
+Provides summarized cost analysis with breakdowns, top services, and actionable insights.
+
+```python
+# Get cost analysis with insights
+analysis = aws.get_cost_analysis(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    dimensions=["SERVICE", "REGION"]
+)
+
+# Example output structure:
+{
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "dimensions": ["SERVICE", "REGION"],
+    "total_cost": 123.45,
+    "cost_breakdown": {
+        "AmazonEC2": 80.00,
+        "AmazonS3": 30.00,
+        "AmazonRDS": 13.45
+    },
+    "top_services": [
+        {"service": "AmazonEC2", "cost": 80.00},
+        {"service": "AmazonS3", "cost": 30.00},
+        {"service": "AmazonRDS", "cost": 13.45}
+    ],
+    "cost_trends": [
+        {"period": "2024-01-01 to 2024-01-02", "cost": 4.00}
+    ],
+    "insights": [
+        "Top service 'AmazonEC2' accounts for 64.8% of total costs",
+        "Top 3 services account for 100.0% of total costs"
+    ]
+}
+```
+
+**Use case:** High-level cost summary, executive reporting, cost optimization insights.
+
+##### 1.3 `get_cost_trends` - Cost Trends Analysis
+Analyzes cost trends over time with patterns, growth rates, and trend detection.
+
+```python
+# Get cost trends with detailed analysis
+trends = aws.get_cost_trends(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    granularity="DAILY"
+)
+
+# Example output structure:
+{
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "granularity": "DAILY",
+    "total_periods": 31,
+    "total_cost": 123.45,
+    "average_daily_cost": 3.98,
+    "trend_direction": "increasing",
+    "growth_rate": 15.2,
+    "patterns": ["High cost variability", "Weekend cost reduction"],
+    "insights": [
+        "Total cost over 31 periods: $123.45",
+        "Average cost per period: $3.98",
+        "Cost trend is increasing (15.2% change)",
+        "Peak cost period: 2024-01-15 to 2024-01-16 ($8.00)"
+    ],
+    "peak_periods": [
+        {"period": "2024-01-15 to 2024-01-16", "cost": 8.00, "date": "2024-01-15"}
+    ],
+    "cost_periods": [
+        {"period": "2024-01-01 to 2024-01-02", "cost": 4.00, "date": "2024-01-01"}
+    ]
+}
+```
+
+**Use case:** Trend analysis, anomaly detection, cost forecasting preparation.
+
+##### 1.4 `get_resource_costs` - Resource-Level Cost Analysis
+Provides resource-specific cost analysis with utilization insights and recommendations.
+
+```python
+# Get resource-specific costs
+resource_costs = aws.get_resource_costs(
+    resource_id="i-0df615a5315c31029",
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    granularity="DAILY"
+)
+
+# Example output structure:
+{
+    "resource_id": "i-0df615a5315c31029",
+    "resource_type": "EC2 Instance",
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "granularity": "DAILY",
+    "total_cost": 12.34,
+    "total_periods": 31,
+    "active_periods": 20,
+    "cost_breakdown": {
+        "BoxUsage:t2.micro": 10.00,
+        "DataTransfer-Out-Bytes": 2.34
+    },
+    "utilization_insights": [
+        "EC2 utilization rate: 64.5% (20 active out of 31 periods)",
+        "Low EC2 utilization detected - consider stopping or downsizing instances"
+    ],
+    "cost_trends": ["EC2 cost trend: Stable"],
+    "recommendations": [
+        "Top EC2 cost component: BoxUsage:t2.micro (81.0% of total) - review for optimization",
+        "Note: Analysis based on EC2 service costs. For specific resource costs, use AWS Cost Explorer with resource tags."
+    ]
+}
+```
+
+**Use case:** Resource optimization, instance-level cost analysis, utilization monitoring.
+
+#### Method Comparison Summary
+
+| Method | Returns | Analysis Level | Insights | Grouping | Best For |
+|--------|---------|---------------|----------|----------|----------|
+| `get_cost_data` | Raw list | Any | ❌ | Custom | Custom reporting, data export |
+| `get_cost_analysis` | Summary dict | Account-wide | ✅ | Service/Region | Executive summaries, cost breakdowns |
+| `get_cost_trends` | Trends dict | Account-wide | ✅ | Time-based | Trend analysis, anomaly detection |
+| `get_resource_costs` | Resource dict | Resource/Type | ✅ | Service/Usage | Resource optimization, utilization |
+
+#### Azure Cost Management
+Azure provides the same four cost management methods with Azure-specific implementations:
+
+##### 1.1 `get_cost_data` - Raw Cost Data
+Fetches raw cost and usage data from Azure Cost Management API.
+
+```python
+# Get raw cost data
+cost_data = azure.get_cost_data(
     start_date="2024-01-01",
     end_date="2024-01-31",
     granularity="Daily",
-    group_by=["SERVICE", "REGION"]
+    group_by=["ResourceType", "ResourceLocation"]
 )
 
-# Cost analysis by dimensions
-analysis = client.get_cost_analysis(
-    dimensions=["SERVICE", "USAGE_TYPE", "REGION"]
-)
-
-# Cost trends over time
-trends = client.get_cost_trends(granularity="Daily")
-
-# Resource-specific costs
-resource_costs = client.get_resource_costs("i-1234567890abcdef0")
+# Example output structure:
+{
+    "properties": {
+        "nextLink": "https://management.azure.com/subscriptions/...",
+        "columns": [
+            {"name": "UsageDate", "type": "String"},
+            {"name": "ResourceType", "type": "String"},
+            {"name": "ResourceLocation", "type": "String"},
+            {"name": "PreTaxCost", "type": "Number"}
+        ],
+        "rows": [
+            ["2024-01-01", "Microsoft.Compute/virtualMachines", "East US", 15.50],
+            ["2024-01-01", "Microsoft.Storage/storageAccounts", "East US", 2.30]
+        ]
+    }
+}
 ```
+
+**Use case:** Custom reporting, data export, when you need raw Azure cost data.
+
+##### 1.2 `get_cost_analysis` - Cost Analysis with Insights
+Provides summarized cost analysis with Azure-specific dimensions.
+
+```python
+# Get cost analysis with insights
+analysis = azure.get_cost_analysis(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    dimensions=["ResourceType", "ResourceLocation", "ResourceGroupName"]
+)
+
+# Example output structure:
+{
+    "properties": {
+        "columns": [
+            {"name": "ResourceType", "type": "String"},
+            {"name": "ResourceLocation", "type": "String"},
+            {"name": "ResourceGroupName", "type": "String"},
+            {"name": "PreTaxCost", "type": "Number"}
+        ],
+        "rows": [
+            ["Microsoft.Compute/virtualMachines", "East US", "my-rg", 465.00],
+            ["Microsoft.Storage/storageAccounts", "East US", "my-rg", 69.00],
+            ["Microsoft.Network/virtualNetworks", "East US", "my-rg", 12.00]
+        ]
+    }
+}
+```
+
+**Use case:** High-level cost summary, executive reporting, Azure resource optimization.
+
+##### 1.3 `get_cost_trends` - Cost Trends Analysis
+Analyzes cost trends over time with Azure-specific granularity.
+
+```python
+# Get cost trends with detailed analysis
+trends = azure.get_cost_trends(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    granularity="Daily"
+)
+
+# Example output structure:
+{
+    "properties": {
+        "columns": [
+            {"name": "UsageDate", "type": "String"},
+            {"name": "PreTaxCost", "type": "Number"}
+        ],
+        "rows": [
+            ["2024-01-01", 18.50],
+            ["2024-01-02", 19.20],
+            ["2024-01-03", 17.80]
+        ]
+    }
+}
+```
+
+**Use case:** Trend analysis, anomaly detection, Azure cost forecasting preparation.
+
+##### 1.4 `get_resource_costs` - Resource-Level Cost Analysis
+Provides resource-specific cost analysis for Azure resources.
+
+```python
+# Get resource-specific costs
+resource_costs = azure.get_resource_costs(
+    resource_id="/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm",
+    start_date="2024-01-01",
+    end_date="2024-01-31"
+)
+
+# Example output structure:
+{
+    "properties": {
+        "columns": [
+            {"name": "UsageDate", "type": "String"},
+            {"name": "ResourceId", "type": "String"},
+            {"name": "PreTaxCost", "type": "Number"}
+        ],
+        "rows": [
+            ["2024-01-01", "/subscriptions/.../virtualMachines/my-vm", 15.50],
+            ["2024-01-02", "/subscriptions/.../virtualMachines/my-vm", 15.50]
+        ]
+    }
+}
+```
+
+**Use case:** Azure resource optimization, VM-level cost analysis, utilization monitoring.
+
+#### GCP Cost Management
+GCP provides the same four cost management methods with GCP-specific implementations:
+
+##### 1.1 `get_cost_data` - Raw Cost Data
+Fetches raw cost and usage data from GCP Billing API (requires BigQuery billing export).
+
+```python
+# Get raw cost data
+cost_data = gcp.get_cost_data(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    granularity="Daily",
+    group_by=["service", "location", "project"]
+)
+
+# Example output structure:
+{
+    "message": "GCP cost data requires BigQuery billing export setup",
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "cost_data": [
+        {
+            "usage_start_time": "2024-01-01T00:00:00Z",
+            "usage_end_time": "2024-01-02T00:00:00Z",
+            "service": "Compute Engine",
+            "location": "us-central1",
+            "project": "my-project",
+            "cost": 12.50
+        }
+    ]
+}
+```
+
+**Use case:** Custom reporting, data export, when you need raw GCP cost data.
+
+##### 1.2 `get_cost_analysis` - Cost Analysis with Insights
+Provides summarized cost analysis with GCP-specific dimensions.
+
+```python
+# Get cost analysis with insights
+analysis = gcp.get_cost_analysis(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    dimensions=["service", "location", "project"]
+)
+
+# Example output structure:
+{
+    "message": "GCP cost analysis requires BigQuery billing export setup",
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "cost_breakdown": {
+        "Compute Engine": 375.00,
+        "Cloud Storage": 45.00,
+        "Cloud SQL": 120.00
+    },
+    "dimensions": ["service", "location", "project"]
+}
+```
+
+**Use case:** High-level cost summary, executive reporting, GCP service optimization.
+
+##### 1.3 `get_cost_trends` - Cost Trends Analysis
+Analyzes cost trends over time with GCP-specific granularity.
+
+```python
+# Get cost trends with detailed analysis
+trends = gcp.get_cost_trends(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    granularity="Daily"
+)
+
+# Example output structure:
+{
+    "message": "GCP cost trends require BigQuery billing export setup",
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "granularity": "Daily",
+    "cost_trends": [
+        {"date": "2024-01-01", "cost": 18.50},
+        {"date": "2024-01-02", "cost": 19.20},
+        {"date": "2024-01-03", "cost": 17.80}
+    ]
+}
+```
+
+**Use case:** Trend analysis, anomaly detection, GCP cost forecasting preparation.
+
+##### 1.4 `get_resource_costs` - Resource-Level Cost Analysis
+Provides resource-specific cost analysis for GCP resources.
+
+```python
+# Get resource-specific costs
+resource_costs = gcp.get_resource_costs(
+    resource_id="projects/my-project/zones/us-central1-a/instances/my-instance",
+    start_date="2024-01-01",
+    end_date="2024-01-31"
+)
+
+# Example output structure:
+{
+    "message": "GCP resource costs require BigQuery billing export setup",
+    "resource_id": "projects/my-project/zones/us-central1-a/instances/my-instance",
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "cost_breakdown": {
+        "Compute Engine Instance": 15.50,
+        "Persistent Disk": 2.30,
+        "Network Egress": 1.20
+    }
+}
+```
+
+**Use case:** GCP resource optimization, instance-level cost analysis, utilization monitoring.
+
+#### Cross-Cloud Method Comparison
+
+| Method | AWS | Azure | GCP | Best For |
+|--------|-----|-------|-----|----------|
+| `get_cost_data` | ✅ Raw Cost Explorer data | ✅ Raw Cost Management data | ✅ Raw Billing data (BigQuery) | Custom reporting, data export |
+| `get_cost_analysis` | ✅ Enhanced with insights | ✅ Azure-specific dimensions | ✅ GCP-specific dimensions | Executive summaries, cost breakdowns |
+| `get_cost_trends` | ✅ Enhanced trend analysis | ✅ Time-based analysis | ✅ Time-based analysis | Trend analysis, anomaly detection |
+| `get_resource_costs` | ✅ Resource-level analysis | ✅ Resource-specific filtering | ✅ Resource-specific filtering | Resource optimization, utilization |
 
 ### 2. Budget Management
 ```python
@@ -156,6 +538,41 @@ report = client.generate_cost_report(
     start_date="2024-01-01",
     end_date="2024-01-31"
 )
+```
+
+### Enhanced Cost Trends Analysis
+```python
+# Get detailed cost trends with analysis
+trends = client.get_cost_trends(
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    granularity="DAILY"
+)
+
+# Sample output structure:
+{
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "granularity": "DAILY",
+    "total_periods": 31,
+    "total_cost": 1250.75,
+    "average_daily_cost": 40.35,
+    "trend_direction": "increasing",
+    "growth_rate": 15.2,
+    "patterns": ["High cost variability", "Weekend cost reduction"],
+    "insights": [
+        "Total cost over 31 periods: $1250.75",
+        "Average cost per period: $40.35",
+        "Cost trend is increasing (15.2% change)",
+        "Peak cost period: 2024-01-15 to 2024-01-16 ($85.20)"
+    ],
+    "peak_periods": [
+        {"period": "2024-01-15 to 2024-01-16", "cost": 85.20, "date": "2024-01-15"}
+    ],
+    "cost_periods": [
+        {"period": "2024-01-01 to 2024-01-02", "cost": 35.50, "date": "2024-01-01"},
+        # ... more periods
+    ]
+}
 ```
 
 ### 5. Governance & Compliance

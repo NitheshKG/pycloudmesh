@@ -120,36 +120,25 @@ class AWSProvider(CloudProvider):
         )
     
     def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
-        dimensions = kwargs.get('dimensions', ['SERVICE', 'USAGE_TYPE', 'REGION'])
-        group_by = [{"Type": "DIMENSION", "Key": dim} for dim in dimensions]
-        return self.cost_client.get_aws_cost_data(
+        return self.cost_client.get_aws_cost_analysis(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            group_by=group_by
+            dimensions=kwargs.get('dimensions')
         )
     
     def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
-        return self.cost_client.get_aws_cost_data(
+        return self.cost_client.get_aws_cost_trends(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
             granularity=kwargs.get('granularity', 'DAILY')
         )
     
-    def get_resource_costs(self, resource_id: str, **kwargs) -> Dict[str, Any]:
-        filter_ = {
-            "And": [
-                {
-                    "Dimensions": {
-                        "Key": "RESOURCE_ID",
-                        "Values": [resource_id]
-                    }
-                }
-            ]
-        }
-        return self.cost_client.get_aws_cost_data(
+    def get_resource_costs(self, **kwargs) -> Dict[str, Any]:
+        return self.cost_client.get_aws_resource_costs(
+            resource_id=kwargs.get('resource_id'),
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            filter_=filter_
+            granularity=kwargs.get('granularity', 'DAILY')
         )
     
     # Advanced FinOps Features
@@ -190,7 +179,8 @@ class AWSProvider(CloudProvider):
             budget_name=kwargs.get('budget_name'),
             budget_amount=kwargs.get('budget_amount'),
             budget_type=kwargs.get('budget_type', 'COST'),
-            time_unit=kwargs.get('time_unit', 'MONTHLY')
+            time_unit=kwargs.get('time_unit', 'MONTHLY'),
+            notifications_with_subscribers=kwargs.get('notifications_with_subscribers')
         )
     
     def get_budget_notifications(self, **kwargs) -> Dict[str, Any]:

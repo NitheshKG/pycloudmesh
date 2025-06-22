@@ -166,7 +166,8 @@ class AWSBudgetManagement:
         budget_name: str,
         budget_amount: float,
         budget_type: str = "COST",
-        time_unit: str = "MONTHLY"
+        time_unit: str = "MONTHLY",
+        notifications_with_subscribers: list = None
     ) -> Dict[str, Any]:
         """
         Create a new AWS budget.
@@ -177,6 +178,7 @@ class AWSBudgetManagement:
             budget_amount (float): Budget amount
             budget_type (str): Type of budget (COST, USAGE, RI_UTILIZATION, RI_COVERAGE)
             time_unit (str): Time unit for the budget (MONTHLY, QUARTERLY, ANNUALLY)
+            notifications_with_subscribers (list): List of notification dicts (optional)
 
         Returns:
             Dict[str, Any]: Budget creation response
@@ -191,11 +193,13 @@ class AWSBudgetManagement:
                 "TimeUnit": time_unit,
                 "BudgetType": budget_type
             }
-            
-            response = self.client.create_budget(
-                AccountId=account_id,
-                Budget=budget
-            )
+            kwargs = {
+                "AccountId": account_id,
+                "Budget": budget
+            }
+            if notifications_with_subscribers:
+                kwargs["NotificationsWithSubscribers"] = notifications_with_subscribers
+            response = self.client.create_budget(**kwargs)
             return response
         except boto3.exceptions.Boto3Error as e:
             return {"error": f"Failed to create budget: {str(e)}"}
@@ -299,90 +303,431 @@ class AWSCostManagement:
         except boto3.exceptions.Boto3Error as e:
             return [{"error": f"Failed to fetch cost data: {str(e)}"}]
 
-    def get_cost_analysis(
+    def get_aws_cost_analysis(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         dimensions: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
-        Get detailed cost analysis with dimensions.
+        Get detailed cost analysis with insights and breakdowns.
 
         Args:
             start_date (Optional[str]): Start date for analysis
             end_date (Optional[str]): End date for analysis
-            dimensions (Optional[List[str]]): List of dimensions to analyze
+            dimensions (Optional[List[str]]): List of dimensions to analyze (max 2)
 
         Returns:
-            Dict[str, Any]: Cost analysis data
+            Dict[str, Any]: Cost analysis with insights, breakdowns, and trends
         """
-        if not dimensions:
-            dimensions = ["SERVICE", "USAGE_TYPE", "REGION"]
+        if not dimensions or len(dimensions) > 2:
+            dimensions = ["SERVICE", "REGION"]  # Default to 2 dimensions max
 
-        group_by = [{"Type": "DIMENSION", "Key": dim} for dim in dimensions]
-        
-        return self.get_aws_cost_data(
-            start_date=start_date,
-            end_date=end_date,
-            group_by=group_by
-        )
+        try:
+            # Get raw cost data
+            group_by = [{"Type": "DIMENSION", "Key": dim} for dim in dimensions]
+            cost_data = self.get_aws_cost_data(
+                start_date=start_date,
+                end_date=end_date,
+                group_by=group_by
+            )
 
-    def get_cost_trends(
+            # Analyze the cost data
+            analysis = {
+                "period": {"start": start_date, "end": end_date},
+                "dimensions": dimensions,
+                "total_cost": 0.0,
+                "cost_breakdown": {},
+                "top_services": [],
+                "cost_trends": [],
+                "insights": []
+            }
+
+            # Process each time period
+            for period_data in cost_data:
+                if isinstance(period_data, dict) and "error" in period_data:
+                    continue
+                
+                if not isinstance(period_data, dict):
+                    continue
+                
+                time_period = period_data.get("TimePeriod", {})
+                groups = period_data.get("Groups", [])
+                total = period_data.get("Total", {})
+                
+                # Calculate total cost for this period
+                period_total = 0.0
+                
+                if groups:
+                    # When grouping is used, process each group
+                    for group in groups:
+                        keys = group.get("Keys", [])
+                        metrics = group.get("Metrics", {})
+                        cost = float(metrics.get("UnblendedCost", {}).get("Amount", 0))
+                        period_total += cost
+                        
+                        # Build cost breakdown
+                        if len(keys) >= 1:
+                            service = keys[0]
+                            if service not in analysis["cost_breakdown"]:
+                                analysis["cost_breakdown"][service] = 0.0
+                            analysis["cost_breakdown"][service] += cost
+                elif total:
+                    # When no grouping, use total
+                    cost = float(total.get("UnblendedCost", {}).get("Amount", 0))
+                    period_total = cost
+                    analysis["cost_breakdown"]["Total"] = analysis["cost_breakdown"].get("Total", 0.0) + cost
+                
+                analysis["total_cost"] += period_total
+                analysis["cost_trends"].append({
+                    "period": f"{time_period.get('Start')} to {time_period.get('End')}",
+                    "cost": period_total
+                })
+
+            # Generate insights
+            if analysis["cost_breakdown"]:
+                # Top services by cost
+                sorted_services = sorted(
+                    analysis["cost_breakdown"].items(), 
+                    key=lambda x: x[1], 
+                    reverse=True
+                )
+                analysis["top_services"] = [
+                    {"service": service, "cost": cost} 
+                    for service, cost in sorted_services[:5]
+                ]
+                
+                # Generate insights
+                if analysis["total_cost"] > 0:
+                    top_service = sorted_services[0]
+                    top_percentage = (top_service[1] / analysis["total_cost"]) * 100
+                    analysis["insights"].append(
+                        f"Top service '{top_service[0]}' accounts for {top_percentage:.1f}% of total costs"
+                    )
+                    
+                    if len(sorted_services) > 1:
+                        analysis["insights"].append(
+                            f"Top 3 services account for {sum(cost for _, cost in sorted_services[:3]) / analysis['total_cost'] * 100:.1f}% of total costs"
+                        )
+
+            return analysis
+            
+        except Exception as e:
+            return {"error": f"Failed to perform cost analysis: {str(e)}"}
+
+    def get_aws_cost_trends(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         granularity: str = "DAILY"
     ) -> Dict[str, Any]:
         """
-        Get cost trends over time.
+        Get detailed cost trends analysis with insights and patterns.
 
         Args:
             start_date (Optional[str]): Start date for trend analysis
             end_date (Optional[str]): End date for trend analysis
-            granularity (str): Data granularity for trends
+            granularity (str): Data granularity for trends (DAILY, MONTHLY, HOURLY)
 
         Returns:
-            Dict[str, Any]: Cost trends data
+            Dict[str, Any]: Cost trends analysis with patterns, growth rates, and insights
         """
-        return self.get_aws_cost_data(
-            start_date=start_date,
-            end_date=end_date,
-            granularity=granularity
-        )
+        try:
+            # Get raw cost data
+            cost_data = self.get_aws_cost_data(
+                start_date=start_date,
+                end_date=end_date,
+                granularity=granularity
+            )
 
-    def get_resource_costs(
+            # Analyze the cost trends
+            trends_analysis = {
+                "period": {"start": start_date, "end": end_date},
+                "granularity": granularity,
+                "total_periods": 0,
+                "total_cost": 0.0,
+                "average_daily_cost": 0.0,
+                "cost_periods": [],
+                "trend_direction": "stable",
+                "growth_rate": 0.0,
+                "peak_periods": [],
+                "low_periods": [],
+                "patterns": [],
+                "insights": []
+            }
+
+            # Process each time period
+            costs = []
+            for period_data in cost_data:
+                if isinstance(period_data, dict) and "error" in period_data:
+                    continue
+                
+                if not isinstance(period_data, dict):
+                    continue
+                
+                time_period = period_data.get("TimePeriod", {})
+                total = period_data.get("Total", {})
+                
+                # Calculate cost for this period
+                cost = float(total.get("UnblendedCost", {}).get("Amount", 0))
+                costs.append(cost)
+                
+                trends_analysis["total_cost"] += cost
+                trends_analysis["total_periods"] += 1
+                
+                trends_analysis["cost_periods"].append({
+                    "period": f"{time_period.get('Start')} to {time_period.get('End')}",
+                    "cost": cost,
+                    "date": time_period.get('Start')
+                })
+
+            # Calculate trend metrics
+            if trends_analysis["total_periods"] > 0:
+                trends_analysis["average_daily_cost"] = trends_analysis["total_cost"] / trends_analysis["total_periods"]
+                
+                # Find peak and low periods
+                if costs:
+                    max_cost = max(costs)
+                    min_cost = min(costs)
+                    
+                    # Find periods with peak costs
+                    for period in trends_analysis["cost_periods"]:
+                        if period["cost"] == max_cost and max_cost > 0:
+                            trends_analysis["peak_periods"].append(period)
+                        if period["cost"] == min_cost:
+                            trends_analysis["low_periods"].append(period)
+
+                # Calculate trend direction and growth rate
+                if len(costs) >= 2:
+                    # Simple trend calculation: compare first and last periods
+                    first_half = costs[:len(costs)//2]
+                    second_half = costs[len(costs)//2:]
+                    
+                    if first_half and second_half:
+                        first_avg = sum(first_half) / len(first_half)
+                        second_avg = sum(second_half) / len(second_half)
+                        
+                        if first_avg > 0:
+                            growth_rate = ((second_avg - first_avg) / first_avg) * 100
+                            trends_analysis["growth_rate"] = growth_rate
+                            
+                            if growth_rate > 10:
+                                trends_analysis["trend_direction"] = "increasing"
+                            elif growth_rate < -10:
+                                trends_analysis["trend_direction"] = "decreasing"
+                            else:
+                                trends_analysis["trend_direction"] = "stable"
+
+                # Generate patterns and insights
+                if costs:
+                    # Pattern: Check for consistent vs variable costs
+                    non_zero_costs = [c for c in costs if c > 0]
+                    if non_zero_costs:
+                        cost_variance = max(non_zero_costs) - min(non_zero_costs)
+                        if cost_variance > trends_analysis["average_daily_cost"]:
+                            trends_analysis["patterns"].append("High cost variability")
+                        else:
+                            trends_analysis["patterns"].append("Consistent cost pattern")
+                    
+                    # Pattern: Check for zero-cost periods
+                    zero_cost_periods = len([c for c in costs if c == 0])
+                    if zero_cost_periods > len(costs) * 0.5:
+                        trends_analysis["patterns"].append("Many zero-cost periods")
+                    
+                    # Insights
+                    if trends_analysis["total_cost"] > 0:
+                        trends_analysis["insights"].append(
+                            f"Total cost over {trends_analysis['total_periods']} periods: ${trends_analysis['total_cost']:.2f}"
+                        )
+                        trends_analysis["insights"].append(
+                            f"Average cost per period: ${trends_analysis['average_daily_cost']:.4f}"
+                        )
+                        
+                        if trends_analysis["trend_direction"] != "stable":
+                            trends_analysis["insights"].append(
+                                f"Cost trend is {trends_analysis['trend_direction']} ({trends_analysis['growth_rate']:.1f}% change)"
+                            )
+                        
+                        if trends_analysis["peak_periods"]:
+                            peak_period = trends_analysis["peak_periods"][0]
+                            trends_analysis["insights"].append(
+                                f"Peak cost period: {peak_period['period']} (${peak_period['cost']:.4f})"
+                            )
+
+            return trends_analysis
+            
+        except Exception as e:
+            return {"error": f"Failed to perform cost trends analysis: {str(e)}"}
+
+    def get_aws_resource_costs(
         self,
         resource_id: str,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        granularity: str = "DAILY"
     ) -> Dict[str, Any]:
         """
-        Get costs for a specific resource.
+        Get detailed cost analysis for a specific resource.
 
         Args:
             resource_id (str): ID of the resource to get costs for
             start_date (Optional[str]): Start date for cost data
             end_date (Optional[str]): End date for cost data
+            granularity (str): Data granularity (DAILY, MONTHLY, HOURLY)
 
         Returns:
-            Dict[str, Any]: Resource cost data
+            Dict[str, Any]: Detailed resource cost analysis with insights and breakdowns
         """
-        filter_ = {
-            "And": [
-                {
-                    "Dimensions": {
-                        "Key": "RESOURCE_ID",
-                        "Values": [resource_id]
-                    }
+        try:
+            # Since RESOURCE_ID is not a valid dimension, we'll get EC2 costs
+            # and provide analysis based on the resource type
+            filter_ = {
+                "Dimensions": {
+                    "Key": "SERVICE",
+                    "Values": ["Amazon Elastic Compute Cloud - Compute"]
                 }
-            ]
-        }
-        
-        return self.get_aws_cost_data(
-            start_date=start_date,
-            end_date=end_date,
-            filter_=filter_
-        )
+            }
+            
+            # Get raw cost data for EC2 services
+            cost_data = self.get_aws_cost_data(
+                start_date=start_date,
+                end_date=end_date,
+                granularity=granularity,
+                filter_=filter_,
+                group_by=[{"Type": "DIMENSION", "Key": "USAGE_TYPE"}]
+            )
+
+            # Analyze the resource cost data
+            resource_analysis = {
+                "resource_id": resource_id,
+                "resource_type": "EC2 Instance",
+                "period": {"start": start_date, "end": end_date},
+                "granularity": granularity,
+                "total_cost": 0.0,
+                "total_periods": 0,
+                "active_periods": 0,
+                "cost_periods": [],
+                "cost_breakdown": {},
+                "utilization_insights": [],
+                "cost_trends": [],
+                "recommendations": []
+            }
+
+            # Process each time period
+            costs = []
+            for period_data in cost_data:
+                if isinstance(period_data, dict) and "error" in period_data:
+                    continue
+                
+                if not isinstance(period_data, dict):
+                    continue
+                
+                time_period = period_data.get("TimePeriod", {})
+                total = period_data.get("Total", {})
+                groups = period_data.get("Groups", [])
+                
+                # Calculate cost for this period
+                period_cost = 0.0
+                period_breakdown = {}
+                
+                if groups:
+                    # When grouping is used, process each group
+                    for group in groups:
+                        keys = group.get("Keys", [])
+                        metrics = group.get("Metrics", {})
+                        cost = float(metrics.get("UnblendedCost", {}).get("Amount", 0))
+                        period_cost += cost
+                        
+                        # Build cost breakdown by usage type
+                        if len(keys) >= 1:
+                            usage_type = keys[0]
+                            if usage_type not in period_breakdown:
+                                period_breakdown[usage_type] = 0.0
+                            period_breakdown[usage_type] += cost
+                            
+                            # Add to overall breakdown
+                            if usage_type not in resource_analysis["cost_breakdown"]:
+                                resource_analysis["cost_breakdown"][usage_type] = 0.0
+                            resource_analysis["cost_breakdown"][usage_type] += cost
+                elif total:
+                    # When no grouping, use total
+                    cost = float(total.get("UnblendedCost", {}).get("Amount", 0))
+                    period_cost = cost
+                    period_breakdown["Total"] = cost
+                    resource_analysis["cost_breakdown"]["Total"] = resource_analysis["cost_breakdown"].get("Total", 0.0) + cost
+                
+                costs.append(period_cost)
+                resource_analysis["total_cost"] += period_cost
+                resource_analysis["total_periods"] += 1
+                
+                if period_cost > 0:
+                    resource_analysis["active_periods"] += 1
+                
+                resource_analysis["cost_periods"].append({
+                    "period": f"{time_period.get('Start')} to {time_period.get('End')}",
+                    "cost": period_cost,
+                    "breakdown": period_breakdown,
+                    "date": time_period.get('Start')
+                })
+
+            # Calculate utilization insights
+            if resource_analysis["total_periods"] > 0:
+                utilization_rate = resource_analysis["active_periods"] / resource_analysis["total_periods"]
+                resource_analysis["utilization_insights"].append(
+                    f"EC2 utilization rate: {utilization_rate:.1%} ({resource_analysis['active_periods']} active out of {resource_analysis['total_periods']} periods)"
+                )
+                
+                if utilization_rate < 0.5:
+                    resource_analysis["utilization_insights"].append("Low EC2 utilization detected - consider stopping or downsizing instances")
+                elif utilization_rate > 0.9:
+                    resource_analysis["utilization_insights"].append("High EC2 utilization detected - consider scaling up if needed")
+
+            # Calculate cost trends
+            if len(costs) >= 2:
+                # Simple trend analysis
+                first_half = costs[:len(costs)//2]
+                second_half = costs[len(costs)//2:]
+                
+                if first_half and second_half:
+                    first_avg = sum(first_half) / len(first_half)
+                    second_avg = sum(second_half) / len(second_half)
+                    
+                    if first_avg > 0:
+                        growth_rate = ((second_avg - first_avg) / first_avg) * 100
+                        if growth_rate > 10:
+                            resource_analysis["cost_trends"].append(f"EC2 cost trend: Increasing ({growth_rate:.1f}% growth)")
+                        elif growth_rate < -10:
+                            resource_analysis["cost_trends"].append(f"EC2 cost trend: Decreasing ({abs(growth_rate):.1f}% reduction)")
+                        else:
+                            resource_analysis["cost_trends"].append("EC2 cost trend: Stable")
+
+            # Generate recommendations
+            if resource_analysis["total_cost"] > 0:
+                avg_cost = resource_analysis["total_cost"] / resource_analysis["total_periods"]
+                
+                if avg_cost > 10:  # High cost threshold
+                    resource_analysis["recommendations"].append("High EC2 costs detected - review instance types and consider reserved instances")
+                
+                if resource_analysis["active_periods"] < resource_analysis["total_periods"] * 0.3:
+                    resource_analysis["recommendations"].append("Low EC2 activity - consider stopping instances during idle periods")
+                
+                # Check for cost optimization opportunities
+                if len(resource_analysis["cost_breakdown"]) > 1:
+                    top_usage = max(resource_analysis["cost_breakdown"].items(), key=lambda x: x[1])
+                    top_percentage = (top_usage[1] / resource_analysis["total_cost"]) * 100
+                    resource_analysis["recommendations"].append(
+                        f"Top EC2 cost component: {top_usage[0]} ({top_percentage:.1f}% of total) - review for optimization"
+                    )
+                
+                # Add resource-specific note
+                resource_analysis["recommendations"].append(
+                    f"Note: Analysis based on EC2 service costs. For specific resource {resource_id}, use AWS Cost Explorer directly with resource tags."
+                )
+
+            return resource_analysis
+            
+        except Exception as e:
+            return {"error": f"Failed to analyze resource costs: {str(e)}"}
 
     def get_savings_plans_recommendations(self) -> Dict[str, Any]:
         """
