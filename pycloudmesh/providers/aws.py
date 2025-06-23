@@ -729,38 +729,6 @@ class AWSCostManagement:
         except Exception as e:
             return {"error": f"Failed to analyze resource costs: {str(e)}"}
 
-    def get_savings_plans_recommendations(self) -> Dict[str, Any]:
-        """
-        Get AWS Savings Plans recommendations.
-
-        Returns:
-            Dict[str, Any]: Savings Plans recommendations
-        """
-        try:
-            response = self.client.get_savings_plans_recommendation(
-                LookbackPeriodInDays=30,
-                TermInYears=1,
-                PaymentOption="NO_UPFRONT"
-            )
-            return response
-        except boto3.exceptions.Boto3Error as e:
-            return {"error": f"Failed to get Savings Plans recommendations: {str(e)}"}
-
-    def get_rightsizing_recommendations(self) -> Dict[str, Any]:
-        """
-        Get AWS rightsizing recommendations.
-
-        Returns:
-            Dict[str, Any]: Rightsizing recommendations
-        """
-        try:
-            response = self.client.get_rightsizing_recommendation(
-                Service="AmazonEC2"
-            )
-            return response
-        except boto3.exceptions.Boto3Error as e:
-            return {"error": f"Failed to get rightsizing recommendations: {str(e)}"}
-
 
 class AWSFinOpsOptimization:
     """AWS FinOps Optimization class for cost optimization features."""
@@ -793,18 +761,28 @@ class AWSFinOpsOptimization:
             region_name=region,
         )
 
-    def get_idle_resources(self) -> Dict[str, Any]:
+    def get_idle_resources(self, **kwargs) -> Dict[str, Any]:
         """
-        Identify idle or underutilized resources.
+        Identify idle or underutilized resources, allowing user to pass parameters to describe_instances.
 
         Returns:
             Dict[str, Any]: List of idle resources with cost impact
         """
+        # Map user kwargs to boto3 parameters
+        params = {}
+        if 'InstanceIds' in kwargs:
+            params['InstanceIds'] = kwargs['InstanceIds']
+        if 'DryRun' in kwargs:
+            params['DryRun'] = kwargs['DryRun']
+        if 'Filters' in kwargs:
+            params['Filters'] = kwargs['Filters']
+        if 'NextToken' in kwargs:
+            params['NextToken'] = kwargs['NextToken']
+        if 'MaxResults' in kwargs:
+            params['MaxResults'] = kwargs['MaxResults']
         try:
-            # Get EC2 instances
-            ec2_response = self.ec2_client.describe_instances()
+            ec2_response = self.ec2_client.describe_instances(**params)
             idle_instances = []
-            
             for reservation in ec2_response.get('Reservations', []):
                 for instance in reservation.get('Instances', []):
                     if instance['State']['Name'] == 'running':
@@ -815,7 +793,6 @@ class AWSFinOpsOptimization:
                             'state': instance['State']['Name'],
                             'instance_type': instance['InstanceType']
                         })
-            
             return {
                 'idle_resources': idle_instances,
                 'total_idle_count': len(idle_instances)
@@ -828,12 +805,13 @@ class AWSFinOpsOptimization:
         Get comprehensive optimization recommendations.
 
         Returns:
-            Dict[str, Any]: Optimization recommendations
+            Dict[str, Any]: Optimization recommendations including savings plans,
+                           reservations, rightsizing, and idle resources.
         """
         try:
             recommendations = {
-                'reservations': self._get_reservation_recommendations(),
                 'savings_plans': self._get_savings_plans_recommendations(),
+                'reservations': self._get_reservation_purchase_recommendations(),
                 'rightsizing': self._get_rightsizing_recommendations(),
                 'idle_resources': self.get_idle_resources()
             }
@@ -841,36 +819,88 @@ class AWSFinOpsOptimization:
         except Exception as e:
             return {"error": f"Failed to get optimization recommendations: {str(e)}"}
 
-    def _get_reservation_recommendations(self) -> Dict[str, Any]:
-        """Get reservation recommendations."""
-        try:
-            response = self.ce_client.get_reservation_recommendation(
-                LookbackPeriodInDays=30,
-                TermInYears=1,
-                PaymentOption="NO_UPFRONT"
-            )
-            return response
-        except Exception as e:
-            return {"error": f"Failed to get reservation recommendations: {str(e)}"}
+    def _get_savings_plans_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS Savings Plans recommendations with user-provided parameters.
 
-    def _get_savings_plans_recommendations(self) -> Dict[str, Any]:
-        """Get Savings Plans recommendations."""
+        Returns:
+            Dict[str, Any]: Savings Plans recommendations
+        """
+        # Map user kwargs to boto3 parameters, using defaults if not provided
+        params = {
+            'SavingsPlansType': kwargs.get('SavingsPlansType', 'COMPUTE_SP'),
+            'AccountScope': kwargs.get('AccountScope', 'PAYER'),
+            'LookbackPeriodInDays': kwargs.get('LookbackPeriodInDays', 'THIRTY_DAYS'),
+            'TermInYears': kwargs.get('TermInYears', 'ONE_YEAR'),
+            'PaymentOption': kwargs.get('PaymentOption', 'NO_UPFRONT'),
+        }
+        # Optional parameters
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
+        if 'PageSize' in kwargs:
+            params['PageSize'] = kwargs['PageSize']
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
         try:
-            response = self.ce_client.get_savings_plans_recommendation(
-                LookbackPeriodInDays=30,
-                TermInYears=1,
-                PaymentOption="NO_UPFRONT"
-            )
+            response = self.ce_client.get_savings_plans_purchase_recommendation(**params)
             return response
         except Exception as e:
             return {"error": f"Failed to get Savings Plans recommendations: {str(e)}"}
 
-    def _get_rightsizing_recommendations(self) -> Dict[str, Any]:
-        """Get rightsizing recommendations."""
+    def _get_reservation_purchase_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS Reserved Instance recommendations with user-provided parameters.
+
+        Returns:
+            Dict[str, Any]: Reserved Instance recommendations
+        """
+        # Map user kwargs to boto3 parameters, using defaults if not provided
+        params = {
+            'AccountScope': kwargs.get('AccountScope', 'PAYER'),
+            'LookbackPeriodInDays': kwargs.get('LookbackPeriodInDays', 'THIRTY_DAYS'),
+            'TermInYears': kwargs.get('TermInYears', 'ONE_YEAR'),
+            'PaymentOption': kwargs.get('PaymentOption', 'NO_UPFRONT'),
+            'Service': kwargs.get('Service', 'Amazon Elastic Compute Cloud - Compute'),
+        }
+        # Optional parameters
+        if 'AccountId' in kwargs:
+            params['AccountId'] = kwargs['AccountId']
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
+        if 'PageSize' in kwargs:
+            params['PageSize'] = kwargs['PageSize']
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
+        if 'ServiceSpecification' in kwargs:
+            params['ServiceSpecification'] = kwargs['ServiceSpecification']
         try:
-            response = self.ce_client.get_rightsizing_recommendation(
-                Service="AmazonEC2"
-            )
+            response = self.ce_client.get_reservation_purchase_recommendation(**params)
+            return response
+        except Exception as e:
+            return {"error": f"Failed to get reservation recommendations: {str(e)}"}
+
+    def _get_rightsizing_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS rightsizing recommendations with user-provided parameters.
+
+        Returns:
+            Dict[str, Any]: Rightsizing recommendations
+        """
+        # Map user kwargs to boto3 parameters, using defaults if not provided
+        params = {
+            'Service': kwargs.get('Service', 'AmazonEC2'),
+        }
+        # Optional parameters
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
+        if 'Configuration' in kwargs:
+            params['Configuration'] = kwargs['Configuration']
+        if 'PageSize' in kwargs:
+            params['PageSize'] = kwargs['PageSize']
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
+        try:
+            response = self.ce_client.get_rightsizing_recommendation(**params)
             return response
         except Exception as e:
             return {"error": f"Failed to get rightsizing recommendations: {str(e)}"}

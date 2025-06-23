@@ -190,13 +190,16 @@ class AWSProvider(CloudProvider):
         )
     
     def get_savings_plans_recommendations(self, **kwargs) -> Dict[str, Any]:
-        return self.cost_client.get_savings_plans_recommendations()
+        return self.optimization_client._get_savings_plans_recommendations(**kwargs)
     
     def get_rightsizing_recommendations(self, **kwargs) -> Dict[str, Any]:
-        return self.cost_client.get_rightsizing_recommendations()
+        return self.optimization_client._get_rightsizing_recommendations(**kwargs)
     
     def get_idle_resources(self, **kwargs) -> Dict[str, Any]:
-        return self.optimization_client.get_idle_resources()
+        return self.optimization_client.get_idle_resources(**kwargs)
+    
+    def get_reservation_purchase_recommendations(self, **kwargs) -> Dict[str, Any]:
+        return self.optimization_client._get_reservation_purchase_recommendations(**kwargs)
 
 
 class AzureProvider(CloudProvider):

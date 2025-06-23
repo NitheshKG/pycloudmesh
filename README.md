@@ -478,19 +478,249 @@ resource_costs = gcp.get_resource_costs(
 | `get_resource_costs` | ✅ Resource-level analysis | ✅ Resource-specific filtering | ✅ Resource-specific filtering | Resource optimization, utilization |
 
 ### 2. Budget Management
+
+#### AWS Budget Management
+Create and manage budgets with notifications and thresholds:
+
 ```python
 # List all budgets
-budgets = client.list_budgets()
+budgets = aws.list_budgets(aws_account_id="123456789012")
 
-# Create new budget
-new_budget = client.create_budget(
-    budget_name="Q1 Budget",
+# Create budget with notifications and thresholds
+notifications = [{
+    "Notification": {
+        "NotificationType": "ACTUAL",
+        "ComparisonOperator": "GREATER_THAN",
+        "Threshold": 80.0,
+        "ThresholdType": "PERCENTAGE"
+    },
+    "Subscribers": [
+        {
+            "SubscriptionType": "EMAIL",
+            "Address": "admin@company.com"
+        }
+    ]
+}]
+
+# Create monthly budget with 80% threshold notification
+monthly_budget = aws.create_budget(
+    aws_account_id="123456789012",
+    budget_name="Monthly Production Budget",
     budget_amount=5000.0,
-    time_unit="QUARTERLY"
+    budget_type="COST",
+    time_unit="MONTHLY",
+    notifications_with_subscribers=notifications
 )
 
-# Get budget alerts
-alerts = client.get_budget_notifications(budget_name="Q1 Budget")
+# Create quarterly budget with multiple thresholds
+quarterly_notifications = [
+    {
+        "Notification": {
+            "NotificationType": "ACTUAL",
+            "ComparisonOperator": "GREATER_THAN",
+            "Threshold": 50.0,
+            "ThresholdType": "PERCENTAGE"
+        },
+        "Subscribers": [
+            {"SubscriptionType": "EMAIL", "Address": "team@company.com"}
+        ]
+    },
+    {
+        "Notification": {
+            "NotificationType": "ACTUAL",
+            "ComparisonOperator": "GREATER_THAN",
+            "Threshold": 90.0,
+            "ThresholdType": "PERCENTAGE"
+        },
+        "Subscribers": [
+            {"SubscriptionType": "EMAIL", "Address": "admin@company.com"},
+            {"SubscriptionType": "SNS", "Address": "arn:aws:sns:us-east-1:123456789012:budget-alerts"}
+        ]
+    }
+]
+
+quarterly_budget = aws.create_budget(
+    aws_account_id="123456789012",
+    budget_name="Q1 2024 Budget",
+    budget_amount=15000.0,
+    budget_type="COST",
+    time_unit="QUARTERLY",
+    notifications_with_subscribers=quarterly_notifications
+)
+
+# Get budget notifications
+alerts = aws.get_budget_notifications(
+    aws_account_id="123456789012",
+    budget_name="Monthly Production Budget"
+)
+```
+
+#### Azure Budget Management
+Create and manage Azure budgets with notifications:
+
+```python
+# List all budgets
+budgets = azure.list_budgets(
+    scope=f"subscriptions/{subscription_id}"
+)
+
+# Create budget with notifications
+notifications = {
+    "notifications": {
+        "actual_80_percent": {
+            "enabled": True,
+            "operator": "GreaterThan",
+            "threshold": 80.0,
+            "contact_emails": ["admin@company.com"],
+            "contact_roles": ["Owner"],
+            "contact_groups": ["/subscriptions/12345678-1234-1234-1234-123456789012/resourceGroups/my-rg/providers/Microsoft.Insights/actionGroups/my-action-group"]
+        },
+        "actual_90_percent": {
+            "enabled": True,
+            "operator": "GreaterThan",
+            "threshold": 90.0,
+            "contact_emails": ["admin@company.com", "finance@company.com"],
+            "contact_roles": ["Owner", "Contributor"]
+        }
+    }
+}
+
+# Create monthly budget
+monthly_budget = azure.create_budget(
+    scope=f"subscriptions/{subscription_id}",
+    budget_name="Monthly Azure Budget",
+    amount=3000.0,
+    time_grain="Monthly",
+    notifications=notifications
+)
+
+# Create budget with forecast notifications
+forecast_notifications = {
+    "notifications": {
+        "forecast_80_percent": {
+            "enabled": True,
+            "operator": "GreaterThan",
+            "threshold": 80.0,
+            "contact_emails": ["admin@company.com"],
+            "threshold_type": "Forecasted"
+        }
+    }
+}
+
+forecast_budget = azure.create_budget(
+    scope=f"subscriptions/{subscription_id}",
+    budget_name="Forecast Budget",
+    amount=5000.0,
+    time_grain="Monthly",
+    notifications=forecast_notifications
+)
+```
+
+#### GCP Budget Management
+Create and manage GCP budgets with notifications:
+
+```python
+# List all budgets
+budgets = gcp.list_budgets(
+    billing_account="billingAccounts/123456-789012-345678"
+)
+
+# Create budget with notifications
+notifications = {
+    "pubsubTopic": "projects/my-project/topics/budget-notifications",
+    "schemaVersion": "1.0",
+    "monitoringNotificationChannels": [
+        "projects/my-project/notificationChannels/123456789"
+    ]
+}
+
+# Create monthly budget with threshold rules
+threshold_rules = [
+    {
+        "thresholdPercent": 0.5,
+        "spendBasis": "CURRENT_SPEND"
+    },
+    {
+        "thresholdPercent": 0.8,
+        "spendBasis": "CURRENT_SPEND"
+    },
+    {
+        "thresholdPercent": 1.0,
+        "spendBasis": "CURRENT_SPEND"
+    }
+]
+
+monthly_budget = gcp.create_budget(
+    billing_account="billingAccounts/123456-789012-345678",
+    budget_name="Monthly GCP Budget",
+    amount=2000.0,
+    threshold_rules=threshold_rules,
+    notifications=notifications
+)
+
+# Create budget with custom threshold rules
+custom_thresholds = [
+    {
+        "thresholdPercent": 0.25,
+        "spendBasis": "FORECASTED_SPEND"
+    },
+    {
+        "thresholdPercent": 0.5,
+        "spendBasis": "FORECASTED_SPEND"
+    },
+    {
+        "thresholdPercent": 0.75,
+        "spendBasis": "FORECASTED_SPEND"
+    },
+    {
+        "thresholdPercent": 1.0,
+        "spendBasis": "FORECASTED_SPEND"
+    }
+]
+
+forecast_budget = gcp.create_budget(
+    billing_account="billingAccounts/123456-789012-345678",
+    budget_name="Forecast Budget",
+    amount=5000.0,
+    threshold_rules=custom_thresholds,
+    notifications=notifications
+)
+```
+
+#### Budget Notification Types
+
+| Provider | Notification Types | Threshold Types | Subscriber Types |
+|----------|-------------------|-----------------|------------------|
+| **AWS** | `ACTUAL`, `FORECASTED` | `PERCENTAGE`, `ABSOLUTE_VALUE` | `EMAIL`, `SNS` |
+| **Azure** | `Actual`, `Forecasted` | `Percentage`, `Absolute` | `Email`, `Action Groups`, `Roles` |
+| **GCP** | `CURRENT_SPEND`, `FORECASTED_SPEND` | `Percentage` | `Pub/Sub`, `Monitoring Channels` |
+
+#### Common Budget Patterns
+
+```python
+# Pattern 1: Early Warning System
+early_warning_notifications = [
+    {"threshold": 50.0, "type": "PERCENTAGE", "contacts": ["team@company.com"]},
+    {"threshold": 80.0, "type": "PERCENTAGE", "contacts": ["admin@company.com"]},
+    {"threshold": 95.0, "type": "PERCENTAGE", "contacts": ["emergency@company.com"]}
+]
+
+# Pattern 2: Forecast-Based Alerts
+forecast_notifications = [
+    {"threshold": 80.0, "type": "FORECASTED", "contacts": ["finance@company.com"]},
+    {"threshold": 100.0, "type": "FORECASTED", "contacts": ["admin@company.com"]}
+]
+
+# Pattern 3: Multi-Channel Notifications
+multi_channel_notifications = [
+    {
+        "threshold": 90.0,
+        "type": "PERCENTAGE",
+        "email": ["admin@company.com"],
+        "slack": ["#budget-alerts"],
+        "sms": ["+1234567890"]
+    }
+]
 ```
 
 ### 3. Optimization & Recommendations
@@ -498,14 +728,44 @@ alerts = client.get_budget_notifications(budget_name="Q1 Budget")
 # Get comprehensive optimization recommendations
 optimizations = client.get_optimization_recommendations()
 
-# AWS-specific: Savings Plans recommendations
-savings_plans = aws_client.get_savings_plans_recommendations()
+# AWS-specific: Savings Plans recommendations (now accepts flexible parameters)
+savings_plans = aws_client.get_savings_plans_recommendations(
+    SavingsPlansType="EC2_INSTANCE_SP",
+    TermInYears="THREE_YEARS",
+    PaymentOption="ALL_UPFRONT",
+    AccountScope="LINKED",
+    LookbackPeriodInDays="SIXTY_DAYS",
+    # ... any other supported params
+)
 
-# AWS-specific: Rightsizing recommendations
-rightsizing = aws_client.get_rightsizing_recommendations()
+# AWS-specific: Reservation purchase recommendations (now accepts flexible parameters)
+reservation_recs = aws_client.get_reservation_purchase_recommendations(
+    Service="Amazon Redshift",
+    TermInYears="THREE_YEARS",
+    PaymentOption="ALL_UPFRONT",
+    AccountScope="LINKED",
+    LookbackPeriodInDays="SIXTY_DAYS",
+    ServiceSpecification={"EC2Specification": {"OfferingClass": "STANDARD"}},
+    # ... any other supported params
+)
 
-# AWS-specific: Idle resources
-idle_resources = aws_client.get_idle_resources()
+# AWS-specific: Rightsizing recommendations (now accepts flexible parameters)
+rightsizing = aws_client.get_rightsizing_recommendations(
+    Service="AmazonEC2",
+    Configuration={"RecommendationTarget": "SAME_INSTANCE_FAMILY", "BenefitsConsidered": True},
+    Filter={
+        # ... your filter structure ...
+    },
+    PageSize=100,
+    # ... any other supported params
+)
+
+# AWS-specific: Idle resources (now accepts flexible parameters)
+idle_resources = aws_client.get_idle_resources(
+    Filters=[{"Name": "instance-state-name", "Values": ["running"]}],
+    MaxResults=50,
+    # ... any other supported params
+)
 
 # Azure-specific: Advisor recommendations
 advisor_recs = azure_client.get_advisor_recommendations()

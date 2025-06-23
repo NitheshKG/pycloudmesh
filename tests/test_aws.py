@@ -329,6 +329,100 @@ def test_aws_get_resource_costs():
         print(f"❌ AWS get resource costs test failed: {e}")
         return False
 
+# <------------------- 3 Optimisations and Recommendations ---------------------->
+def test_aws_get_optimization_recommendations():
+    """Test the get optimization recommendations with comprehensive analysis."""
+    try:
+        aws = client
+        optimization_recs = aws.get_optimization_recommendations()
+        print("\n--- Optimization Recommendations Analysis Results ---")
+        
+        if "error" in optimization_recs:
+            print(f"Error: {optimization_recs['error']}")
+        else:
+            # Check for each optimization category
+            print(f"Optimization Categories Found:")
+            
+            # Reservations
+            reservations = optimization_recs.get('reservations', {})
+            if "error" in reservations:
+                print(f"  - Reservations: Error - {reservations['error']}")
+            else:
+                rec_count = len(reservations.get('Recommendations', []))
+                print(f"  - Reservations: {rec_count} recommendations found")
+                if rec_count > 0:
+                    print(f"    * Sample: {reservations['Recommendations'][0].get('RecommendationDetails', {}).get('TargetInstances', [])[:2]}")
+            
+            # Savings Plans
+            savings_plans = optimization_recs.get('savings_plans', {})
+            if "error" in savings_plans:
+                print(f"  - Savings Plans: Error - {savings_plans['error']}")
+            else:
+                rec_count = len(savings_plans.get('SavingsPlansRecommendation', []))
+                print(f"  - Savings Plans: {rec_count} recommendations found")
+                if rec_count > 0:
+                    print(f"    * Sample: {savings_plans['SavingsPlansRecommendation'][0].get('SavingsPlansRecommendationDetails', {}).get('EstimatedSavingsAmount', 'N/A')}")
+            
+            # Rightsizing
+            rightsizing = optimization_recs.get('rightsizing', {})
+            if "error" in rightsizing:
+                print(f"  - Rightsizing: Error - {rightsizing['error']}")
+            else:
+                rec_count = len(rightsizing.get('RightsizingRecommendations', []))
+                print(f"  - Rightsizing: {rec_count} recommendations found")
+                if rec_count > 0:
+                    print(f"    * Sample: {rightsizing['RightsizingRecommendations'][0].get('AccountId', 'N/A')}")
+            
+            # Idle Resources
+            idle_resources = optimization_recs.get('idle_resources', {})
+            if "error" in idle_resources:
+                print(f"  - Idle Resources: Error - {idle_resources['error']}")
+            else:
+                idle_count = idle_resources.get('total_idle_count', 0)
+                print(f"  - Idle Resources: {idle_count} idle resources found")
+                if idle_count > 0:
+                    sample_resources = idle_resources.get('idle_resources', [])[:3]
+                    print(f"    * Sample resources:")
+                    for resource in sample_resources:
+                        print(f"      - {resource.get('resource_id', 'N/A')} ({resource.get('instance_type', 'N/A')})")
+            
+            # Summary
+            total_recommendations = (
+                len(reservations.get('Recommendations', [])) +
+                len(savings_plans.get('SavingsPlansRecommendation', [])) +
+                len(rightsizing.get('RightsizingRecommendations', [])) +
+                idle_resources.get('total_idle_count', 0)
+            )
+            print(f"\nTotal Optimization Opportunities: {total_recommendations}")
+            
+            # Insights
+            print(f"\nOptimization Insights:")
+            if total_recommendations > 0:
+                print(f"  - Found {total_recommendations} potential cost optimization opportunities")
+                if idle_resources.get('total_idle_count', 0) > 0:
+                    print(f"  - {idle_resources['total_idle_count']} idle resources detected - consider stopping or downsizing")
+                if len(reservations.get('Recommendations', [])) > 0:
+                    print(f"  - {len(reservations['Recommendations'])} reservation opportunities available")
+                if len(savings_plans.get('SavingsPlansRecommendation', [])) > 0:
+                    print(f"  - {len(savings_plans['SavingsPlansRecommendation'])} Savings Plans opportunities available")
+                if len(rightsizing.get('RightsizingRecommendations', [])) > 0:
+                    print(f"  - {len(rightsizing['RightsizingRecommendations'])} rightsizing opportunities available")
+            else:
+                print(f"  - No immediate optimization opportunities detected")
+                print(f"  - This could indicate good cost optimization practices or limited usage data")
+        
+        print(f"\nFull optimization recommendations structure:")
+        print(optimization_recs)
+        return True
+    except Exception as e:
+        print(f"❌ AWS get optimization recommendations test failed: {e}")
+        return False
+
+# def test_
+
+
+
+
 
 def main():
     """Run AWS tests."""
@@ -345,7 +439,8 @@ def main():
         # test_aws_get_cost_data,
         # test_aws_get_cost_analysis,
         # test_aws_get_cost_trends,
-        test_aws_get_resource_costs
+        # test_aws_get_resource_costs,
+        test_aws_get_optimization_recommendations
     ]
     passed = 0
     
