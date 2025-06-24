@@ -127,11 +127,7 @@ class AWSProvider(CloudProvider):
         )
     
     def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
-        return self.cost_client.get_aws_cost_trends(
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'DAILY')
-        )
+        return self.cost_client.get_aws_cost_trends(**kwargs)
     
     def get_resource_costs(self, **kwargs) -> Dict[str, Any]:
         return self.cost_client.get_aws_resource_costs(
@@ -146,23 +142,18 @@ class AWSProvider(CloudProvider):
         return self.optimization_client.get_optimization_recommendations()
     
     def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_forecast(
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            forecast_period=kwargs.get('forecast_period', 12)
-        )
+        return self.analytics_client.get_cost_forecast(**kwargs)
     
     def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_anomalies()
+        return self.analytics_client.get_cost_anomalies(**kwargs)
     
     def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_efficiency_metrics()
+        return self.analytics_client.get_cost_efficiency_metrics(**kwargs)
     
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
         return self.analytics_client.generate_cost_report(
             report_type=kwargs.get('report_type', 'monthly'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date')
+            **kwargs
         )
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:

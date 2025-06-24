@@ -150,11 +150,19 @@ analysis = aws.get_cost_analysis(
 Analyzes cost trends over time with patterns, growth rates, and trend detection.
 
 ```python
-# Get cost trends with detailed analysis
+# Get cost trends (now accepts flexible parameters and has robust defaults)
+trends = aws.get_cost_trends()
+
+# Example with custom parameters
 trends = aws.get_cost_trends(
-    start_date="2024-01-01",
-    end_date="2024-01-31",
-    granularity="DAILY"
+    start_date="2024-06-01",
+    end_date="2024-07-01",
+    granularity="DAILY",
+    metrics=["UnblendedCost"],
+    group_by=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+    filter_={
+        # ... your filter structure ...
+    }
 )
 
 # Example output structure:
@@ -779,24 +787,88 @@ idle_recs = gcp_client.get_idle_resource_recommendations()
 
 ### 4. Advanced Analytics
 ```python
-# Cost forecasting
+# Cost forecasting (now accepts flexible parameters and has robust defaults)
 forecast = client.get_cost_forecast(
-    start_date="2024-01-01",
-    end_date="2024-01-31",
-    forecast_period=12
+    # You can specify TimePeriod, Metric, Granularity, Filter, etc.
+    # If not provided, defaults are:
+    #   TimePeriod: today to today+30 days
+    #   Metric: 'UNBLENDED_COST'
+    #   Granularity: 'MONTHLY'
+    # Example with all defaults:
 )
 
-# Cost anomalies
-anomalies = client.get_cost_anomalies()
+# Example with custom parameters:
+forecast = client.get_cost_forecast(
+    TimePeriod={"Start": "2024-07-01", "End": "2024-08-01"},
+    Metric="BLENDED_COST",
+    Granularity="DAILY",
+    Filter={
+        # ... your filter structure ...
+    }
+)
 
-# Cost efficiency metrics
+# Cost anomalies (now accepts flexible parameters and has robust defaults)
+anomalies = client.get_cost_anomalies(
+    # You can specify MonitorArn, DateInterval, Feedback, TotalImpact, etc.
+    # If DateInterval is not provided, defaults are:
+    #   StartDate: one month prior to today
+    #   EndDate: today
+    # Example with all defaults:
+)
+
+# Example with custom parameters:
+anomalies = client.get_cost_anomalies(
+    MonitorArn="arn:aws:ce:us-east-1:123456789012:anomalymonitor/your-monitor",
+    DateInterval={"StartDate": "2024-06-01", "EndDate": "2024-07-01"},
+    Feedback="YES",
+    TotalImpact={"NumericOperator": "GREATER_THAN", "StartValue": 200.0},
+    MaxResults=50
+)
+
+# Cost efficiency metrics (now accepts flexible parameters and has robust defaults)
 efficiency = client.get_cost_efficiency_metrics()
 
-# Generate comprehensive reports
+# Example with user_count and transaction_count (for cost per user/transaction)
+efficiency = client.get_cost_efficiency_metrics(
+    user_count=100,
+    transaction_count=10000
+)
+
+# Example with custom parameters for AWS Cost Explorer (TimePeriod, Granularity, Metrics, GroupBy, Filter, etc.)
+efficiency = client.get_cost_efficiency_metrics(
+    TimePeriod={"Start": "2024-06-01", "End": "2024-07-01"},
+    Granularity="DAILY",
+    Metrics=["UnblendedCost", "UsageQuantity"],
+    GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+    Filter={
+        # ... your filter structure ...
+    },
+    user_count=100,
+    transaction_count=10000
+)
+
+# Generate comprehensive reports (now accepts flexible parameters and is robust to missing metrics)
 report = client.generate_cost_report(
     report_type="monthly",
-    start_date="2024-01-01",
-    end_date="2024-01-31"
+    # You can specify TimePeriod, Granularity, Metrics, GroupBy, Filter, etc.
+    # If not provided, defaults are:
+    #   TimePeriod: first of month to today
+    #   Granularity: 'MONTHLY'
+    #   Metrics: ['UnblendedCost']
+    #   GroupBy: [{"Type": "DIMENSION", "Key": "SERVICE"}]
+    # The method is robust to missing metrics in the AWS response.
+)
+
+# Example with custom parameters for AWS Cost Explorer (TimePeriod, Granularity, Metrics, GroupBy, Filter, etc.)
+report = client.generate_cost_report(
+    report_type="custom",
+    TimePeriod={"Start": "2024-06-01", "End": "2024-07-01"},
+    Granularity="DAILY",
+    Metrics=["BlendedCost", "UsageQuantity"],
+    GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+    Filter={
+        # ... your filter structure ...
+    }
 )
 ```
 

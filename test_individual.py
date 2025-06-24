@@ -3,6 +3,7 @@ from pycloudmesh.providers.aws import AWSCostManagement, AWSFinOpsOptimization
 from pycloudmesh import aws_client
 
 import os
+import json
 
 # Get credentials from environment variables
 AWS_ACCESS_KEY = os.environ.get('AWS_ACCESS_KEY_ID')
@@ -53,15 +54,34 @@ def test_recommendations():
     # result = aws.get_reservation_purchase_recommendations()
     # print(result)
 
-    result = aws.get_savings_plans_recommendations(
-        SavingsPlansType="EC2_INSTANCE_SP",
-    TermInYears="THREE_YEARS",
-    PaymentOption="ALL_UPFRONT",
-    LookbackPeriodInDays="SIXTY_DAYS"
-    )
-    print(result)
+    # result = aws.get_savings_plans_recommendations(
+    #     SavingsPlansType="EC2_INSTANCE_SP",
+    # TermInYears="THREE_YEARS",
+    # PaymentOption="ALL_UPFRONT",
+    # LookbackPeriodInDays="SIXTY_DAYS"
+    # )
+    # print(result)
 
     # result = aws.get_reservation_purchase_recommendations()
+    # print(result)
+
+
+    # result = aws.get_cost_forecast()
+    # print(result)
+
+    # result = aws.get_cost_anomalies(
+    # )
+    # print(result)
+
+    # result = aws.get_cost_efficiency_metrics()
+    # print(result)
+
+    # result = aws.generate_cost_report(
+    #     Metrics=['UnblendedCost', 'AmortizedCost', 'BlendedCost']
+    # )
+
+    result = aws.get_cost_trends()
+    print(json.dumps(result, indent=3))
     # print(result)
 
 

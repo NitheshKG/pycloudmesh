@@ -415,29 +415,32 @@ class AWSCostManagement:
         except Exception as e:
             return {"error": f"Failed to perform cost analysis: {str(e)}"}
 
-    def get_aws_cost_trends(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        granularity: str = "DAILY"
-    ) -> Dict[str, Any]:
+    def get_aws_cost_trends(self, **kwargs) -> Dict[str, Any]:
         """
         Get detailed cost trends analysis with insights and patterns.
+        Accepts flexible parameters and uses sensible defaults if not provided.
 
         Args:
-            start_date (Optional[str]): Start date for trend analysis
-            end_date (Optional[str]): End date for trend analysis
-            granularity (str): Data granularity for trends (DAILY, MONTHLY, HOURLY)
+            **kwargs: start_date, end_date, granularity, and any other supported by get_aws_cost_data
 
         Returns:
             Dict[str, Any]: Cost trends analysis with patterns, growth rates, and insights
         """
+        import datetime
+        today = datetime.date.today()
+        start_date = kwargs.get('start_date', today.replace(day=1).strftime("%Y-%m-%d"))
+        end_date = kwargs.get('end_date', today.strftime("%Y-%m-%d"))
+        granularity = kwargs.get('granularity', 'DAILY')
         try:
             # Get raw cost data
             cost_data = self.get_aws_cost_data(
                 start_date=start_date,
                 end_date=end_date,
-                granularity=granularity
+                granularity=granularity,
+                metrics=kwargs.get('metrics'),
+                group_by=kwargs.get('group_by'),
+                filter_=kwargs.get('filter_'),
+                sort_by=kwargs.get('sort_by')
             )
 
             # Analyze the cost trends
@@ -461,20 +464,14 @@ class AWSCostManagement:
             for period_data in cost_data:
                 if isinstance(period_data, dict) and "error" in period_data:
                     continue
-                
                 if not isinstance(period_data, dict):
                     continue
-                
                 time_period = period_data.get("TimePeriod", {})
                 total = period_data.get("Total", {})
-                
-                # Calculate cost for this period
                 cost = float(total.get("UnblendedCost", {}).get("Amount", 0))
                 costs.append(cost)
-                
                 trends_analysis["total_cost"] += cost
                 trends_analysis["total_periods"] += 1
-                
                 trends_analysis["cost_periods"].append({
                     "period": f"{time_period.get('Start')} to {time_period.get('End')}",
                     "cost": cost,
@@ -1009,117 +1006,259 @@ class AWSFinOpsAnalytics:
             region_name=region,
         )
 
-    def get_cost_forecast(
-        self,
-        start_date: str,
-        end_date: str,
-        forecast_period: int = 12
-    ) -> Dict[str, Any]:
-        """
-        Get cost forecast for the specified period.
+    def get_default_forecast_time_period(self, kwargs):
+        import datetime
+        def parse_date(date_str):
+            return datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+        today = datetime.date.today()
+        # 1. If TimePeriod is provided, use it as-is
+        if 'TimePeriod' in kwargs:
+            tp = kwargs['TimePeriod']
+            start = parse_date(tp['Start'])
+            if start < today:
+                tp['Start'] = str(today)
+            return tp
+        # 2. If both start_date and end_date are provided
+        if 'start_date' in kwargs and 'end_date' in kwargs:
+            start = parse_date(kwargs['start_date'])
+            end = parse_date(kwargs['end_date'])
+            if start < today:
+                start = today
+            if end <= start:
+                raise ValueError("end_date must be after start_date for forecast.")
+            return {'Start': str(start), 'End': str(end)}
+        # 3. If only start_date is provided
+        if 'start_date' in kwargs:
+            start = parse_date(kwargs['start_date'])
+            if start < today:
+                start = today
+            end = start + datetime.timedelta(days=30)
+            return {'Start': str(start), 'End': str(end)}
+        # 4. If only end_date is provided
+        if 'end_date' in kwargs:
+            end = parse_date(kwargs['end_date'])
+            start = today
+            if end <= start:
+                raise ValueError("end_date must be after today for forecast.")
+            return {'Start': str(start), 'End': str(end)}
+        # 5. Default: today to today+30 days
+        return {'Start': str(today), 'End': str(today + datetime.timedelta(days=30))}
 
-        Args:
-            start_date (str): Start date for historical data
-            end_date (str): End date for historical data
-            forecast_period (int): Number of months to forecast
+    def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get cost forecast for the specified period, allowing user to pass any supported parameters.
+        Ensures required parameters (TimePeriod, Metric, Granularity) are present with defaults if not provided.
+        TimePeriod is always in the future as required by AWS.
 
         Returns:
             Dict[str, Any]: Cost forecast data
         """
+        params = {}
+        # TimePeriod with improved logic for forecast
+        params['TimePeriod'] = self.get_default_forecast_time_period(kwargs)
+        # Metric
+        params['Metric'] = kwargs.get('Metric', 'UNBLENDED_COST')
+        # Granularity
+        params['Granularity'] = kwargs.get('Granularity', 'MONTHLY')
+        # Optional parameters
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
+        if 'BillingViewArn' in kwargs:
+            params['BillingViewArn'] = kwargs['BillingViewArn']
+        if 'PredictionIntervalLevel' in kwargs:
+            params['PredictionIntervalLevel'] = kwargs['PredictionIntervalLevel']
         try:
-            response = self.ce_client.get_cost_forecast(
-                TimePeriod={
-                    "Start": start_date,
-                    "End": end_date
-                },
-                Metric="UNBLENDED_COST",
-                Granularity="MONTHLY",
-                PredictionIntervalInDays=forecast_period * 30
-            )
+            response = self.ce_client.get_cost_forecast(**params)
             return response
         except Exception as e:
             return {"error": f"Failed to get cost forecast: {str(e)}"}
 
-    def get_cost_anomalies(self) -> Dict[str, Any]:
+    def get_default_date_interval(self, kwargs):
+        import datetime
+        today = datetime.date.today()
+        # Calculate one month ago
+        if today.month == 1:
+            start_date = today.replace(year=today.year - 1, month=12)
+        else:
+            start_date = today.replace(month=today.month - 1)
+        return {
+            'StartDate': str(start_date),
+            'EndDate': str(today)
+        }
+    
+    def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
         """
-        Get cost anomalies.
+        Get cost anomalies with user-provided parameters.
+        Ensures required parameters (DateInterval) are present with defaults if not provided.
 
         Returns:
             Dict[str, Any]: Cost anomalies data
         """
+        # Map user kwargs to boto3 parameters
+        params = {}
+        
+        # Required parameter: DateInterval (with default)
+        if 'DateInterval' in kwargs:
+            params['DateInterval'] = kwargs['DateInterval']
+        else:
+            params['DateInterval'] = self.get_default_date_interval(kwargs)
+        
+        # Optional parameters
+        if 'MonitorArn' in kwargs:
+            params['MonitorArn'] = kwargs['MonitorArn']
+        if 'Feedback' in kwargs:
+            params['Feedback'] = kwargs['Feedback']
+        if 'TotalImpact' in kwargs:
+            # Validate TotalImpact structure if provided
+            total_impact = kwargs['TotalImpact']
+            if 'NumericOperator' not in total_impact or 'StartValue' not in total_impact:
+                raise ValueError("TotalImpact must contain 'NumericOperator' and 'StartValue'")
+            params['TotalImpact'] = total_impact
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
+        if 'MaxResults' in kwargs:
+            params['MaxResults'] = kwargs['MaxResults']
+        
         try:
-            # This would typically use AWS Cost Anomaly Detection
-            # For now, return a placeholder structure
-            return {
-                "anomalies": [
-                    {
-                        "anomaly_id": "anomaly-123",
-                        "service": "AmazonEC2",
-                        "cost_impact": 150.00,
-                        "detection_date": "2024-01-15"
-                    }
-                ]
-            }
+            response = self.ce_client.get_anomalies(**params)
+            return response
         except Exception as e:
             return {"error": f"Failed to get cost anomalies: {str(e)}"}
 
-    def get_cost_efficiency_metrics(self) -> Dict[str, Any]:
+    def get_cost_efficiency_metrics(self, user_count=None, transaction_count=None, **kwargs) -> Dict[str, Any]:
         """
-        Get cost efficiency metrics.
+        Calculate real cost efficiency metrics from AWS Cost Explorer.
+        Allows user to pass any supported parameters to get_cost_and_usage.
+        Ensures required parameters (TimePeriod, Granularity) are present with sensible defaults if not provided.
+
+        Args:
+            user_count (int, optional): Number of users for cost per user
+            transaction_count (int, optional): Number of transactions for cost per transaction
+            **kwargs: Any supported parameters for get_cost_and_usage (e.g., TimePeriod, Granularity, Filter, Metrics, GroupBy, BillingViewArn, NextPageToken)
 
         Returns:
             Dict[str, Any]: Cost efficiency metrics
         """
+        import datetime
+        today = datetime.date.today()
+        # TimePeriod
+        if 'TimePeriod' in kwargs:
+            time_period = kwargs['TimePeriod']
+            # Fix: Ensure Start and End are not None or missing
+            if 'Start' not in time_period or time_period['Start'] is None:
+                time_period['Start'] = today.replace(day=1).strftime("%Y-%m-%d")
+            if 'End' not in time_period or time_period['End'] is None:
+                time_period['End'] = today.strftime("%Y-%m-%d")
+        else:
+            start_date = kwargs.get('start_date', today.replace(day=1).strftime("%Y-%m-%d"))
+            end_date = kwargs.get('end_date', today.strftime("%Y-%m-%d"))
+            time_period = {"Start": start_date, "End": end_date}
+        # Granularity
+        granularity = kwargs.get('Granularity', 'MONTHLY')
+        # Metrics
+        metrics = kwargs.get('Metrics', ['UnblendedCost'])
+        # GroupBy
+        group_by = kwargs.get('GroupBy', [{"Type": "DIMENSION", "Key": "SERVICE"}])
+        # Build params for boto3
+        params = {
+            "TimePeriod": time_period,
+            "Granularity": granularity,
+            "Metrics": metrics,
+            "GroupBy": group_by
+        }
+        # Optional params
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
+        if 'BillingViewArn' in kwargs:
+            params['BillingViewArn'] = kwargs['BillingViewArn']
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
         try:
-            # Calculate efficiency metrics based on cost data
-            return {
-                "efficiency_metrics": {
-                    "cost_per_user": 25.50,
-                    "cost_per_transaction": 0.15,
-                    "utilization_rate": 0.75,
-                    "waste_percentage": 0.25
-                }
+            cost_data = self.ce_client.get_cost_and_usage(**params)
+            total_cost = 0.0
+            cost_by_service = {}
+            for result in cost_data.get('ResultsByTime', []):
+                for group in result.get('Groups', []):
+                    key = group['Keys'][0]
+                    amount = float(group['Metrics'][metrics[0]]['Amount'])
+                    cost_by_service[key] = amount
+                    total_cost += amount
+            # Placeholder: Waste estimate (could be improved with tagging logic)
+            waste_cost = 0.0
+            metrics_result = {
+                "total_cost": total_cost,
+                "cost_by_service": cost_by_service,
+                "waste_estimate": waste_cost,
             }
+            if user_count:
+                metrics_result["cost_per_user"] = total_cost / user_count
+            if transaction_count:
+                metrics_result["cost_per_transaction"] = total_cost / transaction_count
+            return {"efficiency_metrics": metrics_result}
         except Exception as e:
             return {"error": f"Failed to get cost efficiency metrics: {str(e)}"}
 
-    def generate_cost_report(
-        self,
-        report_type: str = "monthly",
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def generate_cost_report(self, report_type: str = "monthly", **kwargs) -> Dict[str, Any]:
         """
-        Generate comprehensive cost report.
+        Generate comprehensive cost report using AWS Cost Explorer get_cost_and_usage.
+        Allows user to pass any supported parameters (TimePeriod, Granularity, Metrics, GroupBy, Filter, BillingViewArn, NextPageToken, etc.).
+        Ensures required parameters (TimePeriod, Granularity, Metrics, GroupBy) are present with sensible defaults if not provided.
 
         Args:
             report_type (str): Type of report (monthly, quarterly, annual)
-            start_date (Optional[str]): Start date for report
-            end_date (Optional[str]): End date for report
+            **kwargs: Any supported parameters for get_cost_and_usage
 
         Returns:
             Dict[str, Any]: Cost report
         """
+        import datetime
+        today = datetime.date.today()
+        # TimePeriod
+        if 'TimePeriod' in kwargs:
+            time_period = kwargs['TimePeriod']
+            # Fix: Ensure Start and End are not None or missing
+            if 'Start' not in time_period or time_period['Start'] is None:
+                time_period['Start'] = today.replace(day=1).strftime("%Y-%m-%d")
+            if 'End' not in time_period or time_period['End'] is None:
+                time_period['End'] = today.strftime("%Y-%m-%d")
+        else:
+            start_date = kwargs.get('start_date', today.replace(day=1).strftime("%Y-%m-%d"))
+            end_date = kwargs.get('end_date', today.strftime("%Y-%m-%d"))
+            time_period = {"Start": start_date, "End": end_date}
+        # Granularity
+        granularity = kwargs.get('Granularity', 'MONTHLY')
+        # Metrics
+        metrics = kwargs.get('Metrics', ['UnblendedCost'])
+        # GroupBy
+        group_by = kwargs.get('GroupBy', [{"Type": "DIMENSION", "Key": "SERVICE"}])
+        # Build params for boto3
+        params = {
+            "TimePeriod": time_period,
+            "Granularity": granularity,
+            "Metrics": metrics,
+            "GroupBy": group_by
+        }
+        # Optional params
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
+        if 'BillingViewArn' in kwargs:
+            params['BillingViewArn'] = kwargs['BillingViewArn']
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
         try:
-            if not start_date or not end_date:
-                today = datetime.today()
-                start_date = today.replace(day=1).strftime("%Y-%m-%d")
-                end_date = today.strftime("%Y-%m-%d")
-
-            cost_data = self.ce_client.get_cost_and_usage(
-                TimePeriod={"Start": start_date, "End": end_date},
-                Granularity="MONTHLY",
-                Metrics=["UnblendedCost"],
-                GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}]
-            )
-
+            cost_data = self.ce_client.get_cost_and_usage(**params)
+            total_cost = 0.0
+            metric_key = metrics[0]
+            for result in cost_data.get('ResultsByTime', []):
+                total = result.get('Total', {})
+                if metric_key in total and 'Amount' in total[metric_key]:
+                    total_cost += float(total[metric_key]['Amount'])
             return {
                 "report_type": report_type,
-                "period": {"start": start_date, "end": end_date},
-                "total_cost": sum(float(result['Total']['UnblendedCost']['Amount']) 
-                                for result in cost_data.get('ResultsByTime', [])),
+                "period": {"start": time_period['Start'], "end": time_period['End']},
+                "total_cost": total_cost,
                 "cost_by_service": cost_data.get('ResultsByTime', []),
-                "generated_at": datetime.now().isoformat()
+                "generated_at": datetime.datetime.now().isoformat()
             }
         except Exception as e:
             return {"error": f"Failed to generate cost report: {str(e)}"}
