@@ -21,7 +21,7 @@ ACCOUNT_ID = os.getenv("AWS_ACCOUNT_ID")
 
 # Budget config
 BUDGET_NAME = "TestBudget-PyCloudMesh"
-BUDGET_AMOUNT = 100.0  # USD
+BUDGET_AMOUNT = 1.0  # USD
 
 # Initialize AWS client
 client = aws_client(
@@ -71,7 +71,7 @@ def test_aws_methods():
         return False
 
 
-def test_aws_budget():
+def test_aws_create_budget():
     """Test AWS budget functionality."""
     try:
         # Initialize AWS client
@@ -81,13 +81,29 @@ def test_aws_budget():
             region=REGION
         )
 
+
+        notifications = [{
+            "Notification": {
+                "NotificationType": "ACTUAL",
+                "ComparisonOperator": "GREATER_THAN",
+                "Threshold": 90.0,
+                "ThresholdType": "PERCENTAGE"
+            },
+            "Subscribers": [
+                {
+                    "SubscriptionType": "EMAIL",
+                    "Address": "nitheshkg18@gmail.com"
+                }
+            ]
+        }]
         # Create budget
         result = aws.create_budget(
             aws_account_id=ACCOUNT_ID,
             budget_name=BUDGET_NAME,
             budget_amount=BUDGET_AMOUNT,
             budget_type="COST",
-            time_unit="MONTHLY"
+            time_unit="MONTHLY",
+            notifications_with_subscribers=notifications
         )
 
         print(result)
@@ -432,7 +448,7 @@ def main():
     tests = [
         # test_aws_client_creation,
         #  test_aws_methods,
-        #  test_aws_budget,
+         test_aws_create_budget,
         #  test_aws_list_budgets,
         #  test_aws_create_quarterly_budget,
         #  test_aws_get_budget_notifications,
@@ -440,7 +456,7 @@ def main():
         # test_aws_get_cost_analysis,
         # test_aws_get_cost_trends,
         # test_aws_get_resource_costs,
-        test_aws_get_optimization_recommendations
+        # test_aws_get_optimization_recommendations
     ]
     passed = 0
     

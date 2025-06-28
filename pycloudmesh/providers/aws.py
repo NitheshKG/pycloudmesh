@@ -24,18 +24,13 @@ class AWSReservationCost:
             region_name=region,
         )
 
-    def get_reservation_cost(
-        self,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        granularity: str = "MONTHLY"
-    ) -> Dict[str, Any]:
+    def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
         """
         Get AWS reservation utilization and cost data.
 
         Args:
-            start_date (Optional[str]): Start date in YYYY-MM-DD format. Defaults to first day of current month.
-            end_date (Optional[str]): End date in YYYY-MM-DD format. Defaults to last day of current month.
+            start_date (Optional[str]): Start date in YYYY-MM-DD format. Defaults to one month before today.
+            end_date (Optional[str]): End date in YYYY-MM-DD format. Defaults to today.
             granularity (str): Data granularity. Options: "DAILY", "MONTHLY", "HOURLY". Defaults to "MONTHLY".
 
         Returns:
@@ -44,12 +39,15 @@ class AWSReservationCost:
         Raises:
             boto3.exceptions.Boto3Error: If AWS API call fails
         """
+
+        start_date = kwargs.get('start_date')
+        end_date = kwargs.get('end_date')
+        granularity = kwargs.get('granularity', 'MONTHLY')
+
         if not start_date or not end_date:
             today = datetime.today()
-            start_date = today.replace(day=1).strftime("%Y-%m-%d")
-            next_month = today.replace(day=28) + timedelta(days=4)
-            end_date = next_month.replace(day=1) - timedelta(days=1)
-            end_date = end_date.strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+            start_date = (today - timedelta(days=30)).strftime("%Y-%m-%d")
 
         try:
             response = self.client.get_reservation_utilization(
@@ -60,51 +58,87 @@ class AWSReservationCost:
         except boto3.exceptions.Boto3Error as e:
             return {"error": f"Failed to fetch reservation utilization: {str(e)}"}
 
-    def get_reservation_recommendation(
-        self,
-        look_back_period: str = '60',
-        term: str = 'ONE_YEAR',
-        payment_option: str = "ALL_UPFRONT",
-        /
-    ) -> List[Dict[str, Any]]:
+    def get_reservation_purchase_recommendation(self, **kwargs) -> dict:
         """
-        Get AWS reservation recommendations for various services.
+        Get AWS reservation purchase recommendations for various services using Cost Explorer.
 
-        Args:
-            look_back_period (str): Number of days to look back for usage data. Defaults to '60'.
-            term (str): Reservation term. Options: "ONE_YEAR", "THREE_YEARS". Defaults to "ONE_YEAR".
-            payment_option (str): Payment option. Options: "ALL_UPFRONT", "PARTIAL_UPFRONT", "NO_UPFRONT". Defaults to "ALL_UPFRONT".
+        Parameters (all optional, with defaults shown):
+            Service (str): e.g., 'AmazonEC2', 'AmazonRDS', etc. (default: 'AmazonEC2')
+            LookbackPeriodInDays (str): 'SEVEN_DAYS', 'THIRTY_DAYS', 'SIXTY_DAYS' (default: 'SIXTY_DAYS')
+            TermInYears (str): 'ONE_YEAR', 'THREE_YEARS' (default: 'ONE_YEAR')
+            PaymentOption (str): 'NO_UPFRONT', 'PARTIAL_UPFRONT', 'ALL_UPFRONT' (default: 'NO_UPFRONT')
+            AccountScope (str): 'PAYER' or 'LINKED' (default: 'PAYER')
+            AccountId (str): AWS Account ID (optional)
+            NextPageToken (str): for pagination (optional)
+            PageSize (int): for pagination (optional)
+            Filter (dict): Expression for filtering (optional)
+            ServiceSpecification (dict): e.g., {"EC2Specification": {"OfferingClass": "STANDARD"}} (optional)
 
         Returns:
-            List[Dict[str, Any]]: List of reservation recommendations.
-
-        Raises:
-            boto3.exceptions.Boto3Error: If AWS API call fails
+            dict: Full response from AWS get_reservation_purchase_recommendation
         """
-        services_list = [
-            AWSReservationService.AMAZONEC2,
-            AWSReservationService.AMAZONRDS,
-            AWSReservationService.AMAZONREDSHIFT,
-            AWSReservationService.AMAZONELASTICCACHE,
-            AWSReservationService.AMAZONOPENSEARCHSERVICE
-        ]
-
         params = {
-            "LookbackPeriodInDays": look_back_period,
-            "TermInYears": term,
-            "PaymentOption": payment_option
+            'Service': kwargs.get('Service', 'AmazonEC2'),
+            'LookbackPeriodInDays': kwargs.get('LookbackPeriodInDays', 'SIXTY_DAYS'),
+            'TermInYears': kwargs.get('TermInYears', 'ONE_YEAR'),
+            'PaymentOption': kwargs.get('PaymentOption', 'NO_UPFRONT'),
+            'AccountScope': kwargs.get('AccountScope', 'PAYER'),
         }
-
-        all_response = []
-
+        # Optional parameters
+        if 'AccountId' in kwargs:
+            params['AccountId'] = kwargs['AccountId']
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
+        if 'PageSize' in kwargs:
+            params['PageSize'] = kwargs['PageSize']
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
+        if 'ServiceSpecification' in kwargs:
+            params['ServiceSpecification'] = kwargs['ServiceSpecification']
         try:
-            for service in services_list:
-                params["service"] = service
-                response = self.client.get_reservation_recommendation(params)
-                all_response.extend(response.get("Recommendations", []))
-            return all_response
-        except boto3.exceptions.Boto3Error as e:
-            return [{"error": f"Failed to fetch reservation recommendations: {str(e)}"}]
+            response = self.client.get_reservation_purchase_recommendation(**params)
+            return response
+        except Exception as e:
+            return {"error": str(e)}
+
+    def get_reservation_coverage(self, **kwargs) -> dict:
+        """
+        Get AWS reservation coverage data using Cost Explorer.
+
+        Parameters (all optional, with defaults shown):
+            start_date (str): Start date in YYYY-MM-DD format (default: 30 days ago)
+            end_date (str): End date in YYYY-MM-DD format (default: today)
+            granularity (str): 'DAILY' or 'MONTHLY' (default: 'MONTHLY')
+            GroupBy (list): List of dicts for grouping (optional)
+            Filter (dict): Expression for filtering (optional)
+            NextPageToken (str): for pagination (optional)
+
+        Returns:
+            dict: Full response from AWS get_reservation_coverage
+        """
+        from datetime import datetime, timedelta
+        start_date = kwargs.get('start_date')
+        end_date = kwargs.get('end_date')
+        granularity = kwargs.get('granularity', 'MONTHLY')
+        if not end_date:
+            end_date = datetime.today().strftime('%Y-%m-%d')
+        if not start_date:
+            start_date = (datetime.today() - timedelta(days=30)).strftime('%Y-%m-%d')
+        params = {
+            'TimePeriod': {'Start': start_date, 'End': end_date},
+            'Granularity': granularity
+        }
+        if 'GroupBy' in kwargs:
+            params['GroupBy'] = kwargs['GroupBy']
+        if 'Filter' in kwargs:
+            params['Filter'] = kwargs['Filter']
+        if 'NextPageToken' in kwargs:
+            params['NextPageToken'] = kwargs['NextPageToken']
+        try:
+            response = self.client.get_reservation_coverage(**params)
+            return response
+        except Exception as e:
+            return {"error": str(e)}
 
 
 class AWSBudgetManagement:
@@ -928,7 +962,7 @@ class AWSFinOpsGovernance:
             region_name=region,
         )
 
-    def get_cost_allocation_tags(self) -> Dict[str, Any]:
+    def get_cost_allocation_tags(self, **kwargs) -> Dict[str, Any]:
         """
         Get cost allocation tags.
 
@@ -937,13 +971,13 @@ class AWSFinOpsGovernance:
         """
         try:
             response = self.organizations_client.list_tags_for_resource(
-                ResourceId="root"
+                ResourceId=kwargs.get('ResourceId', '')
             )
             return response
         except Exception as e:
             return {"error": f"Failed to get cost allocation tags: {str(e)}"}
 
-    def get_compliance_status(self) -> Dict[str, Any]:
+    def get_compliance_status(self, **kwargs) -> Dict[str, Any]:
         """
         Get compliance status for cost policies.
 
@@ -952,31 +986,45 @@ class AWSFinOpsGovernance:
         """
         try:
             response = self.config_client.get_compliance_details_by_config_rule(
-                ConfigRuleName="cost-optimization-rule"
+                ConfigRuleName=kwargs.get('ConfigRuleName')
             )
             return response
         except Exception as e:
             return {"error": f"Failed to get compliance status: {str(e)}"}
 
-    def get_cost_policies(self) -> Dict[str, Any]:
+    def get_cost_policies(self, **kwargs) -> Dict[str, Any]:
         """
-        Get cost management policies.
+        Get AWS cost-related management policies (e.g., SCPs mentioning cost).
 
         Returns:
             Dict[str, Any]: Cost policies
         """
         try:
-            # This would typically involve AWS Organizations policies
-            # For now, return a placeholder structure
-            return {
-                "policies": [
-                    {
-                        "name": "Cost Optimization Policy",
-                        "description": "Policy for cost optimization",
-                        "status": "active"
-                    }
-                ]
-            }
+            policies = []
+            paginator = self.organizations_client.get_paginator('list_policies')
+            for page in paginator.paginate(Filter='SERVICE_CONTROL_POLICY'):
+                for policy in page.get('Policies', []):
+                    # Optionally, get more details with describe_policy
+                    policy_detail = self.organizations_client.describe_policy(
+                        PolicyId=policy['Id']
+                    )['Policy']
+                    # Filter for cost-related policies by name or description
+                    name = policy_detail['Name'].lower()
+                    description = policy_detail['Description'].lower()
+                    if 'cost' in name or 'cost' in description:
+                        policies.append({
+                            "id": policy_detail['Id'],
+                            "name": policy_detail['Name'],
+                            "description": policy_detail['Description'],
+                            "type": policy_detail['Type'],
+                            "aws_managed": policy_detail['AwsManaged'],
+                            "content": policy_detail['Content'],
+                            "arn": policy_detail['Arn'],
+                            "tags": self.organizations_client.list_tags_for_resource(
+                                ResourceId=policy_detail['Id']
+                            ).get('Tags', [])
+                        })
+            return {"policies": policies}
         except Exception as e:
             return {"error": f"Failed to get cost policies: {str(e)}"}
 
@@ -1198,7 +1246,7 @@ class AWSFinOpsAnalytics:
         except Exception as e:
             return {"error": f"Failed to get cost efficiency metrics: {str(e)}"}
 
-    def generate_cost_report(self, report_type: str = "monthly", **kwargs) -> Dict[str, Any]:
+    def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
         """
         Generate comprehensive cost report using AWS Cost Explorer get_cost_and_usage.
         Allows user to pass any supported parameters (TimePeriod, Granularity, Metrics, GroupBy, Filter, BillingViewArn, NextPageToken, etc.).
@@ -1225,6 +1273,8 @@ class AWSFinOpsAnalytics:
             start_date = kwargs.get('start_date', today.replace(day=1).strftime("%Y-%m-%d"))
             end_date = kwargs.get('end_date', today.strftime("%Y-%m-%d"))
             time_period = {"Start": start_date, "End": end_date}
+
+        report_type = kwargs.get('report_type', 'monthly')
         # Granularity
         granularity = kwargs.get('Granularity', 'MONTHLY')
         # Metrics

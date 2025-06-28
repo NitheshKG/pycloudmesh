@@ -96,11 +96,14 @@ class AWSProvider(CloudProvider):
         self.analytics_client = AWSFinOpsAnalytics(access_key, secret_key, region)
     
     # Core FinOps Features
-    def get_reservation_cost(self) -> Dict[str, Any]:
-        return self.reservation_client.get_reservation_cost()
+    def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
+        return self.reservation_client.get_reservation_cost(**kwargs)
     
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
-        return self.reservation_client.get_reservation_recommendation()
+        return self.reservation_client.get_reservation_recommendation(**kwargs)
+    
+    def get_reservation_coverage(self, **kwargs) -> Dict[str, Any]:
+        return self.reservation_client.get_reservation_coverage(**kwargs)
     
     def list_budgets(self, **kwargs) -> Dict[str, Any]:
         return self.budget_client.list_budgets(
@@ -151,16 +154,13 @@ class AWSProvider(CloudProvider):
         return self.analytics_client.get_cost_efficiency_metrics(**kwargs)
     
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.generate_cost_report(
-            report_type=kwargs.get('report_type', 'monthly'),
-            **kwargs
-        )
+        return self.analytics_client.generate_cost_report(**kwargs)
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
         return {
-            'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(),
-            'compliance_status': self.governance_client.get_compliance_status(),
-            'cost_policies': self.governance_client.get_cost_policies()
+            # 'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(**kwargs),
+            # 'compliance_status': self.governance_client.get_compliance_status(**kwargs),
+            'cost_policies': self.governance_client.get_cost_policies(**kwargs)
         }
     
     # AWS-specific additional methods
@@ -272,9 +272,9 @@ class AzureProvider(CloudProvider):
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
         return {
-            'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(),
-            'policy_compliance': self.governance_client.get_policy_compliance(),
-            'cost_policies': self.governance_client.get_cost_policies()
+            'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(**kwargs),
+            'policy_compliance': self.governance_client.get_policy_compliance(**kwargs),
+            'cost_policies': self.governance_client.get_cost_policies(**kwargs)
         }
     
     # Azure-specific additional methods

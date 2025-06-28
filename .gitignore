@@ -12,6 +12,10 @@
 *.swo
 *~
 
+# PyCharm specific files
+.idea/cloudmesh.iml
+.idea/misc.xml
+
 # Virtual environments
 .venv/
 venv/

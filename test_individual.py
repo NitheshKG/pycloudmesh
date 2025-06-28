@@ -80,8 +80,22 @@ def test_recommendations():
     #     Metrics=['UnblendedCost', 'AmortizedCost', 'BlendedCost']
     # )
 
-    result = aws.get_cost_trends()
-    print(json.dumps(result, indent=3))
+    # result = aws.get_cost_trends()
+
+    # result = aws.get_governance_policies(
+    #     ResourceId = "296683127615",
+    #     ConfigRuleName = "approved-amis-by-tag"
+    #     )
+
+
+    # result = aws.get_reservation_cost()
+
+
+    # result = aws.get_reservation_recommendation
+
+    result = aws.get_reservation_coverage()
+
+    print(json.dumps(result, indent=3, default=str))
     # print(result)
 
 
