@@ -16,6 +16,9 @@
 .idea/cloudmesh.iml
 .idea/misc.xml
 
+# Misc folder
+misc/
+
 # Virtual environments
 .venv/
 venv/
@@ -287,3 +290,7 @@ temp/
 # Local configuration files
 config.local.*
 settings.local.*
+
+
+# Test files
+test_individual.py

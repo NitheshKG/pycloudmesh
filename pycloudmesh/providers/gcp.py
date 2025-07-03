@@ -4,6 +4,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from google.cloud import recommender_v1
 from google.cloud.billing.budgets_v1 import BudgetServiceClient, ListBudgetsRequest, CreateBudgetRequest, Budget
+import os
+from google.cloud import bigquery
 
 
 class GCPReservationCost:
@@ -118,9 +120,7 @@ class GCPBudgetManagement:
     def list_budgets(
         self,
         billing_account: str,
-        /,
-        *,
-        max_results: Optional[int] = None
+        max_results: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         List GCP budgets for a billing account.
@@ -136,11 +136,13 @@ class GCPBudgetManagement:
             Exception: If GCP API call fails
         """
         try:
+            billing_account = billing_account
+            max_results = max_results or 50
             parent = f"billingAccounts/{billing_account}"
             
             request = ListBudgetsRequest(
                 parent=parent,
-                page_size=max_results or 50
+                page_size=max_results
             )
             
             page_result = self.budget_client.list_budgets(request=request)
@@ -179,7 +181,9 @@ class GCPBudgetManagement:
         billing_account: str,
         budget_name: str,
         amount: float,
-        currency_code: str = "USD"
+        currency_code: str = "USD",
+        notifications_rule: dict = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Create a new GCP budget.
@@ -189,6 +193,7 @@ class GCPBudgetManagement:
             budget_name (str): Name of the budget
             amount (float): Budget amount
             currency_code (str): Currency code for the budget
+            notifications_rule (dict): Notification rule for budget alerts
 
         Returns:
             Dict[str, Any]: Budget creation response
@@ -196,36 +201,39 @@ class GCPBudgetManagement:
         try:
             parent = f"billingAccounts/{billing_account}"
             
-            budget = Budget(
-                display_name=budget_name,
-                budget_filter=Budget.Filter(
-                    projects=[f"projects/{self.project_id}"]
-                ),
-                amount=Budget.BudgetAmount(
-                    specified_amount=Budget.BudgetAmount.Money(
-                        currency_code=currency_code,
-                        units=str(int(amount)),
-                        nanos=int((amount % 1) * 1e9)
-                    )
-                ),
-                threshold_rules=[
-                    Budget.ThresholdRule(
-                        threshold_percent=0.5,
-                        spend_basis=Budget.ThresholdRule.SpendBasis.CURRENT_SPEND
-                    ),
-                    Budget.ThresholdRule(
-                        threshold_percent=0.9,
-                        spend_basis=Budget.ThresholdRule.SpendBasis.CURRENT_SPEND
-                    )
+            budget = {
+                "display_name": budget_name,
+                "budget_filter": {
+                    "projects": [f"projects/{self.project_id}"]
+                },
+                "amount": {
+                    "specified_amount": {
+                        "currency_code": currency_code,
+                        "units": int(amount)
+                    }
+                },
+                "threshold_rules": [
+                    {
+                        "threshold_percent": 0.5,
+                        "spend_basis": "CURRENT_SPEND"
+                    },
+                    {
+                        "threshold_percent": 0.9,
+                        "spend_basis": "CURRENT_SPEND"
+                    }
                 ]
-            )
+            }
+            # Add nanos if amount is fractional
+            if amount % 1 != 0:
+                budget["amount"]["specified_amount"]["nanos"] = int((amount % 1) * 1e9)
+            # Debug print the payload
+            import json
+            print("DEBUG BUDGET PAYLOAD:", json.dumps(budget, indent=2, default=str))
+            response = self.budget_client.create_budget(request={
+                "parent": parent,
+                "budget": budget
+            })
             
-            request = CreateBudgetRequest(
-                parent=parent,
-                budget=budget
-            )
-            
-            response = self.budget_client.create_budget(request=request)
             return {
                 "name": response.name,
                 "display_name": response.display_name,
@@ -237,23 +245,40 @@ class GCPBudgetManagement:
         except Exception as e:
             return {"error": f"Failed to create budget: {str(e)}"}
 
-    def get_budget_alerts(self, budget_name: str) -> Dict[str, Any]:
+    def get_budget_alerts(self, billing_account: str, budget_display_name: str) -> Dict[str, Any]:
         """
-        Get alerts for a specific budget.
-
+        Get threshold rules and alert info for a specific budget.
         Args:
-            budget_name (str): Name of the budget
-
+            billing_account (str): GCP billing account ID
+            budget_display_name (str): Display name of the budget
         Returns:
-            Dict[str, Any]: Budget alerts
+            Dict[str, Any]: Budget threshold rules and alert info
         """
         try:
-            # GCP doesn't have a direct budget alerts API
-            # This would typically involve Cloud Monitoring alerts
-            return {
-                "message": "GCP budget alerts require Cloud Monitoring setup",
-                "budget_name": budget_name
-            }
+            parent = f"billingAccounts/{billing_account}"
+            # List all budgets and find the one with the matching display name
+            from google.cloud.billing.budgets_v1 import ListBudgetsRequest
+            request = ListBudgetsRequest(parent=parent)
+            budgets = self.budget_client.list_budgets(request=request)
+            for budget in budgets:
+                if budget.display_name == budget_display_name:
+                    # Return threshold rules and a message about alerting
+                    return {
+                        "budget_name": budget.name,
+                        "display_name": budget.display_name,
+                        "threshold_rules": [
+                            {
+                                "threshold_percent": rule.threshold_percent,
+                                "spend_basis": rule.spend_basis.name
+                            }
+                            for rule in budget.threshold_rules
+                        ],
+                        "message": (
+                            "GCP budget alerts are delivered via Cloud Monitoring and/or Pub/Sub. "
+                            "To receive notifications, ensure you have set up notification channels in the budget configuration."
+                        )
+                    }
+            return {"error": f"Budget with display name '{budget_display_name}' not found."}
         except Exception as e:
             return {"error": f"Failed to get budget alerts: {str(e)}"}
 
@@ -280,46 +305,95 @@ class GCPCostManagement:
         granularity: str = "Monthly",
         metrics: Optional[List[str]] = None,
         group_by: Optional[List[str]] = None,
-        filter_: Optional[Dict[str, Any]] = None
+        filter_: Optional[Dict[str, Any]] = None,
+        bq_project_id: Optional[str] = None,
+        bq_dataset: Optional[str] = None,
+        bq_table: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Fetch GCP cost data from Billing API.
+        Fetch GCP cost data from BigQuery billing export.
 
         Args:
-            start_date (Optional[str]): Start date (YYYY-MM-DD). Defaults to first day of current month.
-            end_date (Optional[str]): End date (YYYY-MM-DD). Defaults to today's date.
-            granularity (str): "Daily", "Monthly", or "None". Defaults to "Monthly".
-            metrics (Optional[List[str]]): List of cost metrics. Defaults to standard cost metrics.
+            start_date (Optional[str]): Start date (YYYY-MM-DD).
+            end_date (Optional[str]): End date (YYYY-MM-DD).
+            granularity (str): "Daily", "Monthly", or "None".
+            metrics (Optional[List[str]]): List of cost metrics.
             group_by (Optional[List[str]]): Grouping criteria.
             filter_ (Optional[Dict[str, Any]]): Filter criteria.
+            bq_project_id (Optional[str]): BigQuery project ID for billing export.
+            bq_dataset (Optional[str]): BigQuery dataset name for billing export.
+            bq_table (Optional[str]): BigQuery table name for billing export.
 
         Returns:
             Dict[str, Any]: Cost data from GCP Billing.
-
-        Raises:
-            Exception: If GCP API call fails
         """
+        import os
+        from google.cloud import bigquery
+        # Set defaults
         if not start_date or not end_date:
             today = datetime.today()
             start_date = today.replace(day=1).strftime("%Y-%m-%d")
             end_date = today.strftime("%Y-%m-%d")
+        if not metrics:
+            metrics = ["cost"]
+        if not group_by:
+            group_by = ["service.description"]
+
+        # BigQuery config (use arguments, then env, then self.project_id)
+        bq_project = bq_project_id or os.environ.get("BQ_PROJECT_ID", self.project_id)
+        bq_dataset = bq_dataset or os.environ.get("BQ_DATASET")
+        bq_table = bq_table or os.environ.get("BQ_TABLE")
+        if not (bq_project and bq_dataset and bq_table):
+            return {"error": "BigQuery billing export table not configured. Pass bq_project_id, bq_dataset, and bq_table to get_cost_data."}
+
+        client = bigquery.Client(project=bq_project, credentials=self.credentials)
+
+        # Build SELECT and GROUP BY
+        select_fields = []
+        group_fields = []
+        for field in group_by:
+            select_fields.append(field)
+            group_fields.append(field)
+        select_fields.append("SUM(cost) as total_cost")
+
+        # Build WHERE
+        where_clauses = [
+            f"usage_start_time >= '{start_date}'",
+            f"usage_end_time <= '{end_date}'"
+        ]
+        if filter_:
+            for k, v in filter_.items():
+                where_clauses.append(f"{k} = '{v}'")
+
+        # Build query
+        query = f"""
+            SELECT {', '.join(select_fields)}
+            FROM `{bq_project}.{bq_dataset}.{bq_table}`
+            WHERE {' AND '.join(where_clauses)}
+            GROUP BY {', '.join(group_fields)}
+            ORDER BY total_cost DESC
+        """
 
         try:
-            # GCP billing data requires BigQuery export setup
-            # This is a placeholder implementation
+            query_job = client.query(query)
+            results = [dict(row) for row in query_job]
             return {
-                "message": "GCP cost data requires BigQuery billing export setup",
                 "period": {"start": start_date, "end": end_date},
-                "cost_data": []
+                "granularity": granularity,
+                "metrics": metrics,
+                "group_by": group_by,
+                "cost_data": results
             }
         except Exception as e:
-            return {"error": f"Failed to fetch cost data: {str(e)}"}
+            return {"error": f"Failed to fetch cost data from BigQuery: {str(e)}"}
 
     def get_cost_analysis(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        dimensions: Optional[List[str]] = None
+        bq_project_id: Optional[str] = None,
+        bq_dataset: Optional[str] = None,
+        bq_table: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get detailed cost analysis with dimensions.
@@ -332,20 +406,25 @@ class GCPCostManagement:
         Returns:
             Dict[str, Any]: Cost analysis data
         """
-        if not dimensions:
-            dimensions = ["service", "location", "project"]
+        dimensions = ["service", "location", "project"]
 
         return self.get_cost_data(
             start_date=start_date,
             end_date=end_date,
-            group_by=dimensions
+            group_by=dimensions,
+            bq_project_id=bq_project_id,
+            bq_dataset=bq_dataset,
+            bq_table=bq_table
         )
 
     def get_cost_trends(
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
-        granularity: str = "Daily"
+        granularity: str = "Daily",
+        bq_project_id: Optional[str] = None,
+        bq_dataset: Optional[str] = None,
+        bq_table: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get cost trends over time.
@@ -361,14 +440,20 @@ class GCPCostManagement:
         return self.get_cost_data(
             start_date=start_date,
             end_date=end_date,
-            granularity=granularity
+            granularity=granularity,
+            bq_project_id=bq_project_id,
+            bq_dataset=bq_dataset,
+            bq_table=bq_table
         )
 
     def get_resource_costs(
         self,
         resource_id: str,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        bq_project_id: Optional[str] = None,
+        bq_dataset: Optional[str] = None,
+        bq_table: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get costs for a specific resource.
@@ -384,7 +469,10 @@ class GCPCostManagement:
         return self.get_cost_data(
             start_date=start_date,
             end_date=end_date,
-            filter_={"resource_id": resource_id}
+            filter_={"resource_id": resource_id},
+            bq_project_id=bq_project_id,
+            bq_dataset=bq_dataset,
+            bq_table=bq_table
         )
 
 

@@ -318,7 +318,7 @@ class GCPProvider(CloudProvider):
     def list_budgets(self, **kwargs) -> Dict[str, Any]:
         return self.budget_client.list_budgets(
             billing_account=kwargs.get('gcp_billing_account'),
-            max_results=kwargs.get('gcp_max_results')
+            max_results=kwargs.get('gcp_max_results'),
         )
     
     def get_cost_data(self, **kwargs) -> Dict[str, Any]:
@@ -328,28 +328,39 @@ class GCPProvider(CloudProvider):
             granularity=kwargs.get('granularity', 'Monthly'),
             metrics=kwargs.get('metrics'),
             group_by=kwargs.get('group_by'),
-            filter_=kwargs.get('filter_')
+            filter_=kwargs.get('filter_'),
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table')
         )
     
     def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
         return self.cost_client.get_cost_analysis(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            dimensions=kwargs.get('dimensions')
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table')
         )
     
     def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
         return self.cost_client.get_cost_trends(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'Daily')
+            granularity=kwargs.get('granularity', 'Daily'),
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table')
         )
     
     def get_resource_costs(self, resource_id: str, **kwargs) -> Dict[str, Any]:
         return self.cost_client.get_resource_costs(
             resource_id=resource_id,
             start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date')
+            end_date=kwargs.get('end_date'),
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table')
         )
     
     # Advanced FinOps Features
@@ -386,15 +397,16 @@ class GCPProvider(CloudProvider):
     # GCP-specific additional methods
     def create_budget(self, **kwargs) -> Dict[str, Any]:
         return self.budget_client.create_budget(
-            billing_account=kwargs.get('gcp_billing_account'),
-            budget_name=kwargs.get('budget_name'),
-            amount=kwargs.get('budget_amount'),
+            billing_account=kwargs.get('billing_account'),
+            budget_name=kwargs.get('budget_name', 'pycloudmesh_budget'),
+            amount=kwargs.get('amount', 1),
             currency_code=kwargs.get('currency_code', 'USD')
         )
     
     def get_budget_alerts(self, **kwargs) -> Dict[str, Any]:
         return self.budget_client.get_budget_alerts(
-            budget_name=kwargs.get('budget_name')
+            billing_account=kwargs.get('billing_account'),
+            budget_display_name=kwargs.get('budget_display_name')
         )
     
     def get_machine_type_recommendations(self, **kwargs) -> Dict[str, Any]:
