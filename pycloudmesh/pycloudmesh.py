@@ -158,8 +158,8 @@ class AWSProvider(CloudProvider):
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
         return {
-            # 'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(**kwargs),
-            # 'compliance_status': self.governance_client.get_compliance_status(**kwargs),
+            'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(**kwargs),
+            'compliance_status': self.governance_client.get_compliance_status(**kwargs),
             'cost_policies': self.governance_client.get_cost_policies(**kwargs)
         }
     
@@ -334,33 +334,43 @@ class GCPProvider(CloudProvider):
             bq_table=kwargs.get('bq_table')
         )
     
-    def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
+    def get_cost_analysis(self, 
+                        bq_project_id: str, 
+                        bq_dataset: str, 
+                        bq_table: str,
+                        **kwargs) -> Dict[str, Any]:
         return self.cost_client.get_cost_analysis(
+            bq_project_id=bq_project_id,
+            bq_dataset=bq_dataset,
+            bq_table=bq_table,
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table')
         )
     
-    def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
+    def get_cost_trends(self, 
+                        bq_project_id: str, 
+                        bq_dataset: str, 
+                        bq_table: str,
+                        **kwargs) -> Dict[str, Any]:
         return self.cost_client.get_cost_trends(
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'Daily'),
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table')
+            bq_project_id=bq_project_id,
+            bq_dataset=bq_dataset,
+            bq_table=bq_table,            
+            **kwargs
         )
     
-    def get_resource_costs(self, resource_id: str, **kwargs) -> Dict[str, Any]:
+    def get_resource_costs(self, 
+                           resource_name: str, 
+                           bq_project_id: str, 
+                           bq_dataset: str, 
+                           bq_table: str,
+                           **kwargs) -> Dict[str, Any]:
         return self.cost_client.get_resource_costs(
-            resource_id=resource_id,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table')
+            resource_name=resource_name,
+            bq_project_id=bq_project_id,
+            bq_dataset=bq_dataset,
+            bq_table=bq_table,
+            **kwargs
         )
     
     # Advanced FinOps Features
@@ -368,30 +378,50 @@ class GCPProvider(CloudProvider):
         return self.optimization_client.get_optimization_recommendations()
     
     def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_forecast(
+        return self.analytics_client.get_cost_forecast_bqml(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            forecast_period=kwargs.get('forecast_period', 12)
+            forecast_period=kwargs.get('forecast_period', 12),
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table')
         )
     
     def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_anomalies()
+        return self.analytics_client.get_cost_anomalies(
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table'),
+            start_date=kwargs.get('start_date'),
+            end_date=kwargs.get('end_date'),
+            anomaly_prob_threshold=kwargs.get('anomaly_prob_threshold'),
+        )
     
     def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_efficiency_metrics()
+        return self.analytics_client.get_cost_efficiency_metrics(
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table'),
+            start_date=kwargs.get('start_date'),
+            end_date=kwargs.get('end_date'),
+            use_ml=kwargs.get('use_ml')
+        ) 
     
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
         return self.analytics_client.generate_cost_report(
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table'),
             report_type=kwargs.get('report_type', 'monthly'),
             start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date')
+            end_date=kwargs.get('end_date'),
         )
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
         return {
-            'cost_allocation_labels': self.governance_client.get_cost_allocation_tags(),
-            'policy_compliance': self.governance_client.get_policy_compliance(),
-            'cost_policies': self.governance_client.get_cost_policies()
+            # 'cost_allocation_labels': self.governance_client.get_cost_allocation_tags(**kwargs),
+            # 'policy_compliance': self.governance_client.get_policy_compliance(**kwargs),
+            'cost_policies': self.governance_client.get_cost_policies(**kwargs)
         }
     
     # GCP-specific additional methods

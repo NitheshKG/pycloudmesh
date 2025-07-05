@@ -145,12 +145,14 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 - **Cost Anomaly Detection**: Azure-native anomaly detection
 
 ### GCP Features
-- **Billing API**: GCP billing integration
-- **Budget API**: Google Cloud Budgets
-- **Recommender API**: Machine learning-based recommendations
-- **BigQuery**: Advanced analytics and reporting
-- **Resource Manager**: Cost allocation with labels
-- **Organization Policy**: Policy compliance management
+- **Billing API**: GCP billing integration with BigQuery export
+- **Budget API**: Google Cloud Budgets with real-time monitoring
+- **Recommender API**: Machine learning-based optimization recommendations
+- **BigQuery ML**: Advanced cost forecasting and anomaly detection
+- **Resource Manager**: Cost allocation with labels and tags
+- **Organization Policy**: Policy compliance management and enforcement
+- **Asset API**: Resource inventory and compliance checking
+- **Advanced Analytics**: ML-powered cost efficiency metrics
 
 ## 🛠️ Advanced Usage
 
@@ -193,6 +195,10 @@ reservation_costs = client.get_reservation_cost()  # Cached for performance
 - `google-cloud-billing` (for GCP)
 - `google-cloud-recommender` (for GCP)
 - `google-cloud-billing-budgets` (for GCP)
+- `google-cloud-asset` (for GCP governance)
+- `google-cloud-org-policy` (for GCP policy compliance)
+- `google-cloud-resource-manager` (for GCP cost allocation)
+- `google-cloud-bigquery` (for GCP advanced analytics)
 
 ### Authentication
 
@@ -288,6 +294,41 @@ gcp = gcp_client("project_id", "/path/to/service-account-key.json")
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 ```
 
+#### GCP IAM Permissions
+
+To use PyCloudMesh with GCP, your service account needs the following roles:
+
+**Basic Cost Management:**
+- `roles/billing.viewer` - View billing information
+- `roles/bigquery.user` - Access BigQuery billing export
+- `roles/recommender.viewer` - View optimization recommendations
+
+**Advanced Governance (Optional):**
+- `roles/cloudasset.viewer` - View resource inventory for compliance
+- `roles/orgpolicy.policyViewer` - View organization policies
+- `roles/resourcemanager.projectIamAdmin` - Manage project labels
+
+**Example Service Account Setup:**
+```bash
+# Grant basic roles
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL" \
+    --role="roles/billing.viewer"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL" \
+    --role="roles/bigquery.user"
+
+# Grant advanced governance roles (optional)
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL" \
+    --role="roles/cloudasset.viewer"
+
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="serviceAccount:YOUR_SERVICE_ACCOUNT_EMAIL" \
+    --role="roles/orgpolicy.policyViewer"
+```
+
 ## 🧪 Testing
 
 Run the test suite:
@@ -329,11 +370,12 @@ For support and questions:
 
 ## 🔄 Roadmap
 
+- [x] Machine learning-based cost predictions (GCP BigQuery ML)
+- [x] Cost allocation automation (GCP labels and tags)
+- [x] Compliance reporting templates (GCP governance policies)
+- [x] Real-time cost monitoring and alerts (GCP budget alerts)
 - [ ] Multi-cloud cost comparison dashboard
 - [ ] Automated cost optimization workflows
 - [ ] Integration with popular FinOps tools
-- [ ] Machine learning-based cost predictions
-- [ ] Real-time cost monitoring and alerts
-- [ ] Cost allocation automation
-- [ ] Compliance reporting templates
+- [ ] Enhanced AWS and Azure governance features
 
