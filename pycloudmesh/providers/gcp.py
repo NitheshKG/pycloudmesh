@@ -24,17 +24,24 @@ class GCPReservationCost:
         self.billing_client = billing_v1.CloudBillingClient(credentials=self.credentials)
         self.recommender_client = recommender_v1.RecommenderClient(credentials=self.credentials)
 
-    @staticmethod
     def get_reservation_cost(
+        self,
+        bq_project_id: str,
+        bq_dataset: str,
+        bq_table: str,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        
     ) -> Dict[str, Any]:
         """
-        Get GCP reservation utilization and cost data.
+        Get GCP reservation utilization and cost data using BigQuery billing export.
 
         Args:
             start_date (Optional[str]): Start date in YYYY-MM-DD format. Defaults to first day of current month.
             end_date (Optional[str]): End date in YYYY-MM-DD format. Defaults to last day of current month.
+            bq_project_id (Optional[str]): BigQuery project ID for billing export.
+            bq_dataset (Optional[str]): BigQuery dataset name for billing export.
+            bq_table (Optional[str]): BigQuery table name for billing export.
 
         Returns:
             Dict[str, Any]: Reservation utilization data from GCP Billing.
@@ -42,6 +49,8 @@ class GCPReservationCost:
         Raises:
             Exception: If GCP API call fails
         """
+        from google.cloud import bigquery
+        
         if not start_date or not end_date:
             today = datetime.today()
             start_date = today.replace(day=1).strftime("%Y-%m-%d")
@@ -50,15 +59,112 @@ class GCPReservationCost:
             end_date = end_date.strftime("%Y-%m-%d")
 
         try:
-            # GCP doesn't have a direct reservation cost API like AWS/Azure
-            # This would typically involve querying billing data for committed use discounts
+            client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
+            
+            # Query for committed use discounts and reservation costs
+            query = f"""
+                SELECT
+                    DATE(usage_start_time) as date,
+                    service.description as service,
+                    sku.description as sku_description,
+                    SUM(cost) as total_cost,
+                    SUM(usage.amount) as usage_amount,
+                    usage.unit as usage_unit,
+                    COUNT(DISTINCT project.id) as project_count
+                FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
+                WHERE 
+                    usage_start_time >= '{start_date}'
+                    AND usage_end_time <= '{end_date}'
+                    AND (
+                        LOWER(sku.description) LIKE '%committed use discount%'
+                        OR LOWER(sku.description) LIKE '%committed use%'
+                        OR LOWER(sku.description) LIKE '%reservation%'
+                        OR LOWER(sku.description) LIKE '%sustained use%'
+                    )
+                    AND LOWER(sku.description) NOT LIKE '%free tier%'
+                GROUP BY date, service, sku_description, usage_unit
+                ORDER BY date DESC, total_cost DESC
+            """
+            
+            query_job = client.query(query)
+            results = list(query_job)
+            
+            # Process results
+            reservation_data = []
+            total_reservation_cost = 0
+            
+            # Check if we found any reservation data
+            if not results:
+                return {
+                    "period": {"start": start_date, "end": end_date},
+                    "total_reservation_cost": 0.0,
+                    "reservation_utilization": [],
+                    "insights": {
+                        "days_with_reservations": 0,
+                        "projects_with_reservations": 0,
+                        "avg_daily_reservation_cost": 0.0,
+                        "total_reservations_found": 0
+                    },
+                    "message": "No reservation data found in BigQuery billing export for the specified period"
+                }
+            
+            for row in results:
+                # Handle None values safely
+                cost = float(row["total_cost"]) if row["total_cost"] is not None else 0.0
+                usage_amount = float(row["usage_amount"]) if row["usage_amount"] is not None else 0.0
+                
+                reservation_data.append({
+                    "date": row["date"].strftime("%Y-%m-%d") if row["date"] else "unknown",
+                    "service": row["service"] if row["service"] else "unknown",
+                    "sku_description": row["sku_description"] if row["sku_description"] else "unknown",
+                    "cost": cost,
+                    "usage_amount": usage_amount,
+                    "usage_unit": row["usage_unit"] if row["usage_unit"] else "unknown",
+                    "project_count": row["project_count"] if row["project_count"] is not None else 0
+                })
+                total_reservation_cost += cost
+            
+            # Get additional reservation insights
+            insights_query = f"""
+                SELECT
+                    COUNT(DISTINCT DATE(usage_start_time)) as days_with_reservations,
+                    COUNT(DISTINCT project.id) as projects_with_reservations,
+                    AVG(cost) as avg_daily_reservation_cost
+                FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
+                WHERE 
+                    usage_start_time >= '{start_date}'
+                    AND usage_end_time <= '{end_date}'
+                    AND (
+                        LOWER(sku.description) LIKE '%committed use discount%'
+                        OR LOWER(sku.description) LIKE '%committed use%'
+                        OR LOWER(sku.description) LIKE '%reservation%'
+                        OR LOWER(sku.description) LIKE '%sustained use%'
+                    )
+                    AND LOWER(sku.description) NOT LIKE '%free tier%'
+            """
+            
+            insights_job = client.query(insights_query)
+            insights = list(insights_job)[0] if list(insights_job) else None
+            
             return {
-                "message": "GCP reservation cost data requires billing export setup",
                 "period": {"start": start_date, "end": end_date},
-                "reservation_utilization": []
+                "total_reservation_cost": round(total_reservation_cost, 2),
+                "reservation_utilization": reservation_data,
+                "insights": {
+                    "days_with_reservations": insights["days_with_reservations"] if insights and insights["days_with_reservations"] is not None else 0,
+                    "projects_with_reservations": insights["projects_with_reservations"] if insights and insights["projects_with_reservations"] is not None else 0,
+                    "avg_daily_reservation_cost": round(float(insights["avg_daily_reservation_cost"]), 2) if insights and insights["avg_daily_reservation_cost"] is not None else 0.0,
+                    "total_reservations_found": len(reservation_data)
+                },
+                "message": f"Reservation cost data retrieved from BigQuery billing export for {len(reservation_data)} reservation records"
             }
+            
         except Exception as e:
-            return {"error": f"Failed to fetch reservation utilization: {str(e)}"}
+            return {
+                "error": f"Failed to fetch reservation utilization: {str(e)}",
+                "period": {"start": start_date, "end": end_date},
+                "message": "GCP reservation cost data requires BigQuery billing export setup with proper permissions"
+            }
 
     def get_reservation_recommendation(self) -> List[Dict[str, Any]]:
         """
@@ -71,18 +177,21 @@ class GCPReservationCost:
             Exception: If GCP API call fails
         """
         try:
-            parent = f"projects/{self.project_id}/locations/global/recommenders/google.compute.instance.MachineTypeRecommender"
+            recommendations = []
             
-            request = recommender_v1.ListRecommendationsRequest(
-                parent=parent,
+            # Get machine type recommendations (most common reservation type)
+            machine_type_parent = f"projects/{self.project_id}/locations/global/recommenders/google.compute.instance.MachineTypeRecommender"
+            
+            machine_type_request = recommender_v1.ListRecommendationsRequest(
+                parent=machine_type_parent,
                 page_size=50
             )
             
-            page_result = self.recommender_client.list_recommendations(request=request)
-            recommendations = []
+            machine_type_results = self.recommender_client.list_recommendations(request=machine_type_request)
             
-            for response in page_result:
+            for response in machine_type_results:
                 recommendations.append({
+                    "type": "machine_type_optimization",
                     "name": response.name,
                     "description": response.description,
                     "primary_impact": {
@@ -94,12 +203,111 @@ class GCPReservationCost:
                     },
                     "state_info": {
                         "state": response.state_info.state.name
-                    }
+                    },
+                    "priority": "high" if "cost" in response.description.lower() else "medium"
                 })
             
-            return recommendations
+            # Get committed use discount recommendations
+            try:
+                cud_parent = f"projects/{self.project_id}/locations/global/recommenders/google.compute.commitment.UsageCommitmentRecommender"
+                
+                cud_request = recommender_v1.ListRecommendationsRequest(
+                    parent=cud_parent,
+                    page_size=20
+                )
+                
+                cud_results = self.recommender_client.list_recommendations(request=cud_request)
+                
+                for response in cud_results:
+                    recommendations.append({
+                        "type": "committed_use_discount",
+                        "name": response.name,
+                        "description": response.description,
+                        "primary_impact": {
+                            "category": response.primary_impact.category.name,
+                            "cost_projection": {
+                                "cost": response.primary_impact.cost_projection.cost.units,
+                                "currency_code": response.primary_impact.cost_projection.cost.currency_code
+                            }
+                        },
+                        "state_info": {
+                            "state": response.state_info.state.name
+                        },
+                        "priority": "high"
+                    })
+            except Exception:
+                # Committed use discount recommender might not be available
+                pass
+            
+            # Get sustained use discount recommendations
+            try:
+                sud_parent = f"projects/{self.project_id}/locations/global/recommenders/google.compute.instance.SustainedUseDiscountRecommender"
+                
+                sud_request = recommender_v1.ListRecommendationsRequest(
+                    parent=sud_parent,
+                    page_size=20
+                )
+                
+                sud_results = self.recommender_client.list_recommendations(request=sud_request)
+                
+                for response in sud_results:
+                    recommendations.append({
+                        "type": "sustained_use_discount",
+                        "name": response.name,
+                        "description": response.description,
+                        "primary_impact": {
+                            "category": response.primary_impact.category.name,
+                            "cost_projection": {
+                                "cost": response.primary_impact.cost_projection.cost.units,
+                                "currency_code": response.primary_impact.cost_projection.cost.currency_code
+                            }
+                        },
+                        "state_info": {
+                            "state": response.state_info.state.name
+                        },
+                        "priority": "medium"
+                    })
+            except Exception:
+                # Sustained use discount recommender might not be available
+                pass
+            
+            # Sort recommendations by priority and potential savings
+            def sort_key(rec):
+                priority_score = {"high": 3, "medium": 2, "low": 1}.get(rec.get("priority", "medium"), 1)
+                cost_savings = float(rec.get("primary_impact", {}).get("cost_projection", {}).get("cost", 0))
+                return (priority_score, -cost_savings)  # Higher priority and cost savings first
+            
+            recommendations.sort(key=sort_key, reverse=True)
+            
+            # Add summary statistics
+            total_potential_savings = sum(
+                float(rec.get("primary_impact", {}).get("cost_projection", {}).get("cost", 0))
+                for rec in recommendations
+            )
+            
+            recommendation_summary = {
+                "total_recommendations": len(recommendations),
+                "total_potential_savings": round(total_potential_savings, 2),
+                "recommendation_types": list(set(rec.get("type", "unknown") for rec in recommendations)),
+                "high_priority_count": len([r for r in recommendations if r.get("priority") == "high"]),
+                "message": f"Found {len(recommendations)} reservation optimization recommendations"
+            }
+            
+            return {
+                "recommendations": recommendations,
+                "summary": recommendation_summary
+            }
+            
         except Exception as e:
-            return [{"error": f"Failed to fetch reservation recommendations: {str(e)}"}]
+            return {
+                "error": f"Failed to fetch reservation recommendations: {str(e)}",
+                "recommendations": [],
+                "summary": {
+                    "total_recommendations": 0,
+                    "total_potential_savings": 0,
+                    "message": "Unable to retrieve reservation recommendations"
+                }
+            }
 
 
 class GCPBudgetManagement:

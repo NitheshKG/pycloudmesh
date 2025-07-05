@@ -309,8 +309,14 @@ class GCPProvider(CloudProvider):
         self.analytics_client = GCPFinOpsAnalytics(project_id, credentials_path)
     
     # Core FinOps Features
-    def get_reservation_cost(self) -> Dict[str, Any]:
-        return self.reservation_client.get_reservation_cost()
+    def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
+        return self.reservation_client.get_reservation_cost(
+            bq_project_id=kwargs.get('bq_project_id'),
+            bq_dataset=kwargs.get('bq_dataset'),
+            bq_table=kwargs.get('bq_table'),
+            start_date=kwargs.get('start_date'),
+            end_date=kwargs.get('end_date'),
+        )
     
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
         return self.reservation_client.get_reservation_recommendation()
@@ -482,9 +488,9 @@ class CloudMesh:
     
     # Core FinOps Features
     @lru_cache(maxsize=128)
-    def get_reservation_cost(self) -> Dict[str, Any]:
+    def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
         """Fetch reservation cost for the selected cloud provider."""
-        return self._provider.get_reservation_cost()
+        return self._provider.get_reservation_cost(**kwargs)
     
     @lru_cache(maxsize=128)
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:

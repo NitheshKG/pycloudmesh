@@ -874,32 +874,43 @@ print(policies)
 
 ---
 
-## 6. Reservation Management
+## 6. Reservation Management *(Beta)*
+
+> **Note:** GCP Reservation Management features are currently in Beta. These features provide comprehensive reservation cost analysis and optimization recommendations using BigQuery billing export and GCP Recommender API.
 
 ### get_reservation_cost
-Get GCP reservation utilization and cost data.
+Get GCP reservation utilization and cost data using BigQuery billing export.
 
 **Signature:**
 ```python
 def get_reservation_cost(
     self,
     start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
+    bq_project_id: Optional[str] = None,
+    bq_dataset: Optional[str] = None,
+    bq_table: Optional[str] = None
 ) -> Dict[str, Any]:
 ```
 
 **Parameters:**
 - `start_date` (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
 - `end_date` (str, optional): End date in YYYY-MM-DD format. Defaults to last day of current month.
+- `bq_project_id` (str, optional): BigQuery project ID for billing export. Defaults to the client's project ID.
+- `bq_dataset` (str, optional): BigQuery dataset name for billing export. Defaults to "billing_dataset".
+- `bq_table` (str, optional): BigQuery table name for billing export. Defaults to "gcp_billing_export_resource_v1_XXXXXX".
 
 **Returns:**
-- Reservation utilization data from GCP Billing.
+- Comprehensive reservation utilization data from GCP Billing BigQuery export.
 
 **Example:**
 ```python
 reservation_data = gcp.get_reservation_cost(
     start_date="2024-06-01",
-    end_date="2024-06-30"
+    end_date="2024-06-30",
+    bq_project_id="your-gcp-project",
+    bq_dataset="billing_dataset",
+    bq_table="gcp_billing_export_resource_v1_BILLING_ACCOUNT"
 )
 print(reservation_data)
 ```
@@ -907,29 +918,52 @@ print(reservation_data)
 **Sample Response:**
 ```json
 {
-   "message": "GCP reservation cost data requires billing export setup",
    "period": {
       "start": "2024-06-01",
       "end": "2024-06-30"
    },
-   "reservation_utilization": []
+   "total_reservation_cost": 1250.75,
+   "reservation_utilization": [
+      {
+         "date": "2024-06-15",
+         "service": "Compute Engine",
+         "sku_description": "E2 Instance Core running with committed use discount",
+         "cost": 45.25,
+         "usage_amount": 86400.0,
+         "usage_unit": "seconds",
+         "project_count": 2
+      }
+   ],
+   "insights": {
+      "days_with_reservations": 30,
+      "projects_with_reservations": 3,
+      "avg_daily_reservation_cost": 41.69,
+      "total_reservations_found": 15
+   },
+   "message": "Reservation cost data retrieved from BigQuery billing export for 15 reservation records"
 }
 ```
+
+**Features:**
+- **BigQuery Integration**: Uses actual billing export data for accurate cost analysis
+- **Comprehensive Filtering**: Identifies committed use discounts, reservations, and sustained use discounts
+- **Detailed Insights**: Provides utilization metrics, project distribution, and cost trends
+- **Error Handling**: Graceful handling of missing data or unavailable BigQuery exports
 
 ---
 
 ### get_reservation_recommendation
-Get GCP reservation recommendations using the Recommender API.
+Get comprehensive GCP reservation optimization recommendations using the Recommender API.
 
 **Signature:**
 ```python
 def get_reservation_recommendation(
     self
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
 ```
 
 **Returns:**
-- List of reservation recommendations.
+- Comprehensive reservation recommendations with priority sorting and cost impact analysis.
 
 **Example:**
 ```python
@@ -939,23 +973,109 @@ print(recommendations)
 
 **Sample Response:**
 ```json
-[
-   {
-      "name": "projects/your-project/locations/global/recommenders/google.compute.instance.MachineTypeRecommender/recommendations/123456",
-      "description": "Change machine type from n1-standard-2 to e2-standard-2",
-      "primary_impact": {
-         "category": "COST",
-         "cost_projection": {
-            "cost": "100",
-            "currency_code": "USD"
-         }
+{
+   "recommendations": [
+      {
+         "type": "committed_use_discount",
+         "name": "projects/your-project/locations/global/recommenders/google.compute.commitment.UsageCommitmentRecommender/recommendations/123456",
+         "description": "Purchase committed use discount for e2-standard-2 instances",
+         "primary_impact": {
+            "category": "COST",
+            "cost_projection": {
+               "cost": "500",
+               "currency_code": "USD"
+            }
+         },
+         "state_info": {
+            "state": "ACTIVE"
+         },
+         "priority": "high"
       },
-      "state_info": {
-         "state": "ACTIVE"
+      {
+         "type": "machine_type_optimization",
+         "name": "projects/your-project/locations/global/recommenders/google.compute.instance.MachineTypeRecommender/recommendations/789012",
+         "description": "Change machine type from n1-standard-2 to e2-standard-2",
+         "primary_impact": {
+            "category": "COST",
+            "cost_projection": {
+               "cost": "200",
+               "currency_code": "USD"
+            }
+         },
+         "state_info": {
+            "state": "ACTIVE"
+         },
+         "priority": "medium"
       }
+   ],
+   "summary": {
+      "total_recommendations": 8,
+      "total_potential_savings": 1200.50,
+      "recommendation_types": ["committed_use_discount", "machine_type_optimization", "sustained_use_discount"],
+      "high_priority_count": 3,
+      "message": "Found 8 reservation optimization recommendations"
    }
-]
+}
 ```
+
+**Features:**
+- **Multiple Recommender Types**: 
+  - Machine Type Optimizer
+  - Committed Use Discount Recommender
+  - Sustained Use Discount Recommender
+- **Priority Sorting**: Recommendations sorted by priority and potential savings
+- **Comprehensive Summary**: Total recommendations, potential savings, and recommendation types
+- **Error Resilience**: Graceful handling of unavailable recommenders
+
+---
+
+### GCP-Specific Reservation Methods
+
+#### get_committed_use_discount_recommendations
+Get dedicated committed use discount recommendations.
+
+**Example:**
+```python
+cud_recommendations = gcp.get_committed_use_discount_recommendations()
+print(cud_recommendations)
+```
+
+#### get_sustained_use_discount_recommendations
+Get dedicated sustained use discount recommendations.
+
+**Example:**
+```python
+sud_recommendations = gcp.get_sustained_use_discount_recommendations()
+print(sud_recommendations)
+```
+
+---
+
+### Prerequisites for GCP Reservation Management
+
+1. **BigQuery Billing Export Setup**:
+   - Enable billing export to BigQuery
+   - Ensure proper IAM permissions for BigQuery access
+   - Verify billing export table contains reservation/discount data
+
+2. **Required IAM Permissions**:
+   - `roles/bigquery.user` - Access BigQuery billing export
+   - `roles/recommender.viewer` - View optimization recommendations
+   - `roles/billing.viewer` - View billing information
+
+3. **API Enablement**:
+   - BigQuery API
+   - Recommender API
+   - Cloud Billing API
+
+### Error Handling
+
+The reservation management methods include comprehensive error handling:
+
+- **Missing BigQuery Data**: Returns appropriate message when no reservation data is found
+- **API Unavailable**: Graceful fallback when recommenders are not available
+- **Permission Issues**: Clear error messages with setup recommendations
+- **Null Data Handling**: Safe processing of missing or null values in BigQuery results
 
 ---
 

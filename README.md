@@ -105,7 +105,6 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 
 **AWS:**  
 [ get_governance_policies ](docs/provider/aws/README.md#get_governance_policies)  
-[ get_cost_allocation_tags ](docs/provider/aws/README.md#get_cost_allocation_tags)
 
 **Azure:**  
 [ get_governance_policies ](docs/provider/azure/README.md#get_governance_policies)
@@ -122,6 +121,10 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 
 **Azure:**  
 [ get_reservation_order_details ](docs/provider/azure/README.md#get_reservation_order_details)
+
+**GCP:** *(Beta)*  
+[ get_reservation_cost ](docs/provider/gcp/README.md#get_reservation_cost)  
+[ get_reservation_recommendation ](docs/provider/gcp/README.md#get_reservation_recommendation)
 
 ---
 
