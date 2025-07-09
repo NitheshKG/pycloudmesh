@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, List
 from functools import lru_cache
 from abc import ABC, abstractmethod
 from pycloudmesh.providers.aws import (
@@ -209,14 +209,39 @@ class AzureProvider(CloudProvider):
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
         return self.reservation_client.get_reservation_recommendation(kwargs.get('subscription_id'))
     
-    def list_budgets(self, **kwargs) -> Dict[str, Any]:
-        return self.budget_client.list_budgets(
-            scope=kwargs.get('azure_scope'),
-            api_version=kwargs.get('api_version', '2024-08-01')
-        )
-    
-    def get_cost_data(self, **kwargs) -> Dict[str, Any]:
+    def get_cost_data(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Fetch Azure cost data for a given scope (subscription, resource group, management group, or billing account).
+
+        Args:
+            scope (str): Azure scope string. Examples:
+                - Subscription: "/subscriptions/{subscription-id}/"
+                - Resource Group: "/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/"
+                - Management Group: "/providers/Microsoft.Management/managementGroups/{management-group-id}/"
+                - Billing Account: "/providers/Microsoft.Billing/billingAccounts/{billing-account-id}"
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today.
+            granularity (str, optional): Data granularity. "Daily", "Monthly", or "None". Defaults to "Monthly".
+            metrics (list, optional): List of cost metrics to aggregate. Defaults:
+                - ["ActualCost"] for subscription/resource group/management group scopes
+                - ["PreTaxCost"] for billing account scope
+                Allowed values:
+                    * Subscription/resource group/management group: "ActualCost", "AmortizedCost", "UsageQuantity"
+                    * Billing account: "UsageQuantity", "PreTaxCost", "PreTaxCostUSD", "CostUSD", "Cost"
+            group_by (list, optional): List of dimensions to group by (e.g., ["ResourceType", "ResourceLocation"]).
+            filter_ (dict, optional): Additional filter criteria for the query.
+
+        Returns:
+            Dict[str, Any]: Cost data from Azure Cost Management API.
+
+        Example:
+            >>> # Subscription scope
+            >>> azure.get_cost_data("/subscriptions/your-subscription-id/", granularity="Monthly", metrics=["ActualCost"])
+            >>> # Billing account scope
+            >>> azure.get_cost_data("/providers/Microsoft.Billing/billingAccounts/your-billing-account-id", metrics=["PreTaxCost"])
+        """
         return self.cost_client.get_cost_data(
+            scope,
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
             granularity=kwargs.get('granularity', 'Monthly'),
@@ -225,30 +250,119 @@ class AzureProvider(CloudProvider):
             filter_=kwargs.get('filter_')
         )
     
-    def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
+    def get_cost_analysis(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost analysis with dimensions, returning a summary with breakdowns and insights.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, management group, or billing account)
+            start_date (Optional[str]): Start date for analysis (YYYY-MM-DD). Defaults to first day of current month.
+            end_date (Optional[str]): End date for analysis (YYYY-MM-DD). Defaults to today.
+            dimensions (Optional[List[str]]): List of dimensions to analyze (group by). E.g. ["ResourceType", "ResourceLocation"]
+
+        Returns:
+            Dict[str, Any]: Cost analysis summary with breakdowns and insights.
+                {
+                    "period": {"start": ..., "end": ...},
+                    "dimensions": [...],
+                    "total_cost": ...,
+                    "cost_breakdown": {...},
+                    "cost_trends": [...],
+                    "insights": [...]
+                }
+
+        Raises:
+            ValueError: If invalid dimensions are provided for the given scope.
+
+        Example:
+            >>> azure.get_cost_analysis(
+            ...     "/subscriptions/your-subscription-id/",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     dimensions=["ResourceType", "ResourceLocation"]
+            ... )
+        """
         return self.cost_client.get_cost_analysis(
+            scope,
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
             dimensions=kwargs.get('dimensions')
         )
     
-    def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
+    def get_cost_trends(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost trends analysis with insights and patterns.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            start_date (Optional[str]): Start date for trend analysis (YYYY-MM-DD). Defaults to first day of current month.
+            end_date (Optional[str]): End date for trend analysis (YYYY-MM-DD). Defaults to today.
+            granularity (str, optional): Data granularity for trends ("Daily", "Monthly", etc.). Defaults to "Daily".
+
+        Returns:
+            Dict[str, Any]: Cost trends analysis with patterns, growth rates, and insights.
+                {
+                    "period": {"start": ..., "end": ...},
+                    "granularity": ...,
+                    "total_periods": ...,
+                    "total_cost": ...,
+                    "average_daily_cost": ...,
+                    "cost_periods": [...],
+                    "trend_direction": ...,
+                    "growth_rate": ...,
+                    "peak_periods": [...],
+                    "low_periods": [...],
+                    "patterns": [...],
+                    "insights": [...]
+                }
+
+        Example:
+            >>> azure.get_cost_trends(
+            ...     "/subscriptions/your-subscription-id/",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="Daily"
+            ... )
+        """
         return self.cost_client.get_cost_trends(
+            scope,
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
             granularity=kwargs.get('granularity', 'Daily')
         )
     
-    def get_resource_costs(self, resource_id: str, **kwargs) -> Dict[str, Any]:
+    def get_resource_costs(self, scope: str, resource_id: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get costs for a specific resource.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            resource_id (str): ID of the resource to get costs for.
+            granularity (str, optional): Data granularity ("Daily", "Monthly", etc.).
+            start_date (Optional[str]): Start date for cost data (YYYY-MM-DD).
+            end_date (Optional[str]): End date for cost data (YYYY-MM-DD).
+            metrics (Optional[str]): Cost metrics to retrieve.
+
+        Returns:
+            Dict[str, Any]: Resource cost data as returned by Azure Cost Management API.
+
+        Example:
+            >>> azure.get_resource_costs(
+            ...     "/subscriptions/your-subscription-id/",
+            ...     "/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.Compute/virtualMachines/your-vm",
+            ...     granularity="Daily",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31"
+            ... )
+        """
         return self.cost_client.get_resource_costs(
-            resource_id=resource_id,
+            scope,
+            resource_id,
+            granularity=kwargs.get('granularity'),
             start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date')
+            end_date=kwargs.get('end_date'),
+            metrics=kwargs.get('metrics')
         )
-    
-    # Advanced FinOps Features
-    def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
-        return self.optimization_client.get_optimization_recommendations()
     
     def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
         return self.analytics_client.get_cost_forecast(
@@ -281,22 +395,198 @@ class AzureProvider(CloudProvider):
     def get_reservation_order_details(self) -> Dict[str, Any]:
         return self.reservation_client.get_azure_reservation_order_details()
     
-    def create_budget(self, **kwargs) -> Dict[str, Any]:
-        return self.budget_client.create_budget(
-            budget_name=kwargs.get('budget_name'),
-            amount=kwargs.get('budget_amount'),
-            scope=kwargs.get('azure_scope'),
-            time_grain=kwargs.get('time_grain', 'Monthly'),
-            start_date=kwargs.get('start_date')
+    def list_budgets(self, 
+                     scope: str,
+                     **kwargs) -> Dict[str, Any]:
+        """
+        List Azure budgets for a scope.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, etc.)
+            **kwargs: Additional parameters including:
+                - api_version (str): API version to use (default: '2024-08-01')
+
+        Returns:
+            Dict[str, Any]: List of budgets for the specified scope
+
+        Raises:
+            requests.exceptions.RequestException: If Azure API call fails
+
+        Example:
+            >>> azure.list_budgets(scope="/subscriptions/your-subscription-id/")
+            >>> azure.list_budgets(scope="/subscriptions/your-subscription-id/resourceGroups/your-rg/")
+            >>> azure.list_budgets(scope="/providers/Microsoft.Billing/billingAccounts/<billing_account_id>")
+
+        """
+        return self.budget_client.list_budgets(
+            scope,
+            api_version=kwargs.get('api_version', '2024-08-01')
         )
     
-    def get_budget_alerts(self, **kwargs) -> Dict[str, Any]:
-        return self.budget_client.get_budget_alerts(
-            budget_name=kwargs.get('budget_name')
+    def create_budget(self, 
+                    budget_name: str,
+                    amount: float,
+                    scope: str,
+                    notifications: List[Dict[str, Any]],
+                    time_grain: str = "Monthly",
+                    **kwargs) -> Dict[str, Any]:
+        """
+        Create a new Azure budget with notifications and thresholds.
+
+        Args:
+            budget_name (str): Name of the budget
+            amount (float): Budget amount in the specified currency
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            notifications (List[Dict[str, Any]]): List of notification configurations
+                Each dict must contain:
+                - enabled (bool): Whether the notification is enabled
+                - operator (str): Comparison operator (GreaterThan, GreaterThanOrEqualTo, LessThan, LessThanOrEqualTo)
+                - threshold (float): Threshold percentage (0-100)
+                - contactEmails (List[str]): List of email addresses to notify
+                - contactRoles (Optional[List[str]]): List of contact roles (Owner, Contributor, Reader)
+                - contactGroups (Optional[List[str]]): List of action group resource IDs
+                - locale (Optional[str]): Locale for notifications (default: "en-us")
+                - thresholdType (Optional[str]): Type of threshold (default: "Actual")
+            time_grain (str): Time grain for the budget (Monthly, Quarterly, Annually)
+            **kwargs: Additional parameters including:
+                - start_date (Optional[str]): Start date for the budget in YYYY-MM-DD format. 
+                  Will be automatically adjusted to the first day of the month if not already.
+                - end_date (Optional[str]): End date for the budget in YYYY-MM-DD format.
+                  Defaults to 5 years from start date if not provided.
+                - api_version (str): API version to use for the Azure Budget API (default: '2024-08-01')
+
+        Returns:
+            Dict[str, Any]: Budget creation response from Azure
+
+        Raises:
+            requests.exceptions.RequestException: If Azure API call fails
+            ValueError: If notifications are not properly configured
+
+        Example:
+            >>> azure.create_budget(
+            ...     budget_name="monthly-budget",
+            ...     amount=1000.0,
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     time_grain="Monthly",
+            ...     notifications=[
+            ...         {
+            ...             "enabled": True,
+            ...             "operator": "GreaterThan",
+            ...             "threshold": 80.0,
+            ...             "contactEmails": ["admin@example.com", "finance@example.com"]
+            ...         }
+            ...     ]
+            ... )
+        """
+        return self.budget_client.create_budget(
+            budget_name,
+            amount,
+            scope,
+            notifications,
+            time_grain,
+            start_date=kwargs.get('start_date'),
+            end_date=kwargs.get('end_date'),
+            api_version=kwargs.get('api_version', '2024-08-01')
+        )
+    
+    def get_budget(self, 
+                   budget_name: str, 
+                   scope: str, 
+                   **kwargs) -> Dict[str, Any]:
+        """
+        Get a specific budget by name and scope.
+
+        Args:
+            budget_name (str): Name of the budget to retrieve
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            **kwargs: Additional parameters including:
+                - api_version (str): API version to use (default: '2024-08-01')
+
+        Returns:
+            Dict[str, Any]: Budget details including notifications
+
+        Raises:
+            requests.exceptions.RequestException: If Azure API call fails
+
+        Example:
+            >>> azure.get_budget(budget_name="monthly-budget", scope="/subscriptions/your-subscription-id/")
+        """
+        return self.budget_client.get_budget(
+            budget_name,
+            scope,
+            api_version=kwargs.get('api_version', '2024-08-01')
         )
     
     def get_advisor_recommendations(self, **kwargs) -> Dict[str, Any]:
-        return self.optimization_client.get_advisor_recommendations()
+        """
+        Get Azure Advisor recommendations for cost optimization.
+
+        Args:
+            api_version (str, optional): API version for the Advisor API. Defaults to '2025-01-01'.
+            filter (dict, optional): Filter dictionary to filter recommendations. Defaults to empty dict.
+
+        Returns:
+            Dict[str, Any]: Advisor recommendations
+        """
+        api_version = kwargs.get('api_version') or kwargs.get('api-version') or "2025-01-01"
+        filter_arg = kwargs.get('filter', '')
+        return self.optimization_client.get_advisor_recommendations(
+            api_version=api_version,
+            filter=filter_arg
+        )
+    
+    def get_reserved_instance_recommendations(self, scope: str, **kwargs):
+        """
+        Get Azure Reserved Instance recommendations for a given scope.
+
+        Args:
+            scope (str): Azure scope string (e.g., "/subscriptions/{subscription-id}").
+            api_version (str, optional): API version for the Reservation Recommendations API.
+                Defaults to "2024-08-01" if not provided.
+            filter (str, optional): OData filter string for server-side filtering
+                (e.g., "ResourceGroup eq 'MyResourceGroup'").
+
+        Returns:
+            Dict[str, Any]: Reserved Instance recommendations (optionally filtered server-side).
+
+        Example:
+            >>> azure.get_reserved_instance_recommendations(
+            ...     scope="/subscriptions/your-subscription-id",
+            ...     filter="ResourceGroup eq 'MyResourceGroup'"
+            ... )
+        """
+        api_version =kwargs.get('api_version') or kwargs.get('api-version') or "2024-08-01"
+        filter_arg = kwargs.get('filter', '')
+        return self.optimization_client.get_reserved_instance_recommendations(
+            scope=scope,
+            api_version=api_version,
+            filter=filter_arg
+        )
+    
+    def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get comprehensive optimization recommendations for Azure, including Advisor and Reserved Instance recommendations.
+
+        Args:
+            scope (str, required): Azure scope string (e.g., "/subscriptions/{subscription-id}").
+            filter (str, optional): OData filter string to filter recommendations server-side (e.g., "Category eq 'Cost'").
+                This filter will be applied to both Advisor and Reserved Instance recommendations.
+            api_version (str, optional): (Not used directly, see below.)
+                - Advisor recommendations always use API version '2025-01-01'.
+                - Reserved Instance recommendations always use API version '2024-08-01'.
+
+        Returns:
+            Dict[str, Any]: Dictionary with keys:
+                - 'advisor_recommendations': List of Azure Advisor recommendations (optionally filtered).
+                - 'reserved_instance_recommendations': List of Reserved Instance recommendations (optionally filtered).
+
+        Example:
+            >>> azure.get_optimization_recommendations(
+            ...     scope="/subscriptions/your-subscription-id",
+            ...     filter="Category eq 'Cost'"
+            ... )
+        """
+        return self.optimization_client.get_optimization_recommendations(**kwargs)
 
 
 class GCPProvider(CloudProvider):

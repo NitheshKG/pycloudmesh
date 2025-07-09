@@ -31,7 +31,7 @@ costs = aws.get_cost_data(start_date="2024-01-01", end_date="2024-01-31")
 
 # Azure Example
 azure = azure_client("your_subscription_id", "your_token")
-analysis = azure.get_cost_analysis(dimensions=["SERVICE", "REGION"])
+analysis = azure.get_cost_analysis("/subscriptions/your-subscription-id/", dimensions=["SERVICE", "REGION"])
 
 # GCP Example
 gcp = gcp_client("your_project_id", "/path/to/credentials.json")
@@ -71,7 +71,8 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 
 **Azure:**  
 [ list_budgets ](docs/provider/azure/README.md#list_budgets)  
-[ create_budget ](docs/provider/azure/README.md#create_budget)
+[ create_budget ](docs/provider/azure/README.md#create_budget)  
+[ get_budget ](docs/provider/azure/README.md#get_budget)
 
 **GCP:**  
 [ list_budgets ](docs/provider/gcp/README.md#list_budgets)  
@@ -87,7 +88,9 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 [ get_idle_resources ](docs/provider/aws/README.md#get_idle_resources)
 
 **Azure:**  
-[ get_advisor_recommendations ](docs/provider/azure/README.md#get_advisor_recommendations)
+[ get_advisor_recommendations ](docs/provider/azure/README.md#get_advisor_recommendations)  
+[ get_optimization_recommendations ](docs/provider/azure/README.md#get_optimization_recommendations)  
+[ get_reserved_instance_recommendations ](docs/provider/azure/README.md#get_reserved_instance_recommendations)
 
 **GCP:**  
 [ get_machine_type_recommendations ](docs/provider/gcp/README.md#get_machine_type_recommendations)  
@@ -140,7 +143,7 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 - **Config**: Compliance and policy management
 
 ### Azure Features
-- **Cost Management API**: Comprehensive cost analysis
+- **Cost Management API**: Comprehensive cost analysis with scope-based queries
 - **Budget API**: Azure-native budget management
 - **Advisor**: Cost optimization recommendations
 - **Policy**: Azure Policy integration for governance
@@ -286,6 +289,23 @@ azure = azure_client("subscription_id", "access_token")
 # Or using Azure CLI
 az login
 # Then use the token from az account get-access-token
+```
+
+**Azure Scopes:**
+Azure cost management methods require a scope parameter to specify the level at which to query costs:
+
+- **Subscription scope**: `/subscriptions/{subscription-id}/`
+- **Resource Group scope**: `/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/`
+- **Billing Account scope**: `/providers/Microsoft.Billing/billingAccounts/{billing-account-id}`
+- **Management Group scope**: `/providers/Microsoft.Management/managementGroups/{management-group-id}/`
+
+Example:
+```python
+# Query costs at subscription level
+costs = azure.get_cost_data("/subscriptions/your-subscription-id/")
+
+# Query costs at resource group level
+costs = azure.get_cost_data("/subscriptions/your-subscription-id/resourceGroups/your-rg/")
 ```
 
 #### GCP
