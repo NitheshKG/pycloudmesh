@@ -5,10 +5,10 @@ with open("requirements.txt") as f:
 
 setup(
     name="pycloudmesh",
-    version="0.1.4",
+    version="1.0.0",
     author="Nithesh",
     author_email="nitheshkg18@gmail.com",
-    description="A package that exposes the cost API data for AWS, Azure, and GCP",
+    description="Unified FinOps and cost analytics toolkit for AWS, Azure, and GCP. Provides programmatic access to cloud cost, budgeting, optimization, and governance APIs.",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/NitheshKG/pycloudmesh",
