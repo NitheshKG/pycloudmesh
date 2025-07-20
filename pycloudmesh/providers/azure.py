@@ -1,6 +1,7 @@
 import requests
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional
+from dateutil.relativedelta import relativedelta
 
 class AzureReservationCost:
     """Azure Reservation Cost Management class for handling Azure reservation-related operations."""
@@ -15,22 +16,26 @@ class AzureReservationCost:
         """
         self.subscription_id = subscription_id
         self.token = token
-        self.base_url = f"https://management.azure.com/subscriptions/{subscription_id}"
+        self.base_url = f"https://management.azure.com"
 
     def get_reservation_cost(
         self,
+        scope: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get Azure reservation utilization and cost data.
 
+        This method first retrieves reservation order details to get specific reservation IDs,
+        then fetches detailed reservation information for each reservation.
+
         Args:
             start_date (Optional[str]): Start date in YYYY-MM-DD format. Defaults to first day of current month.
             end_date (Optional[str]): End date in YYYY-MM-DD format. Defaults to last day of current month.
 
         Returns:
-            Dict[str, Any]: Reservation utilization data from Azure Cost Management.
+            Dict[str, Any]: Reservation utilization data including order details and individual reservation information.
 
         Raises:
             requests.exceptions.RequestException: If Azure API call fails
@@ -44,9 +49,50 @@ class AzureReservationCost:
 
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            url = f"{self.base_url}/providers/Microsoft.CostManagement/query"
             
-            payload = {
+            # Step 1: Get reservation order details
+            reservation_orders_url = f"{self.base_url}{scope}/providers/Microsoft.Capacity/reservationOrders"
+            reservation_orders_params = {"api-version": "2022-11-01"}
+            
+            reservation_orders_response = requests.get(
+                reservation_orders_url, 
+                headers=headers, 
+                params=reservation_orders_params
+            )
+            reservation_orders_response.raise_for_status()
+            reservation_orders_data = reservation_orders_response.json()
+            
+            # Step 2: Get detailed information for each reservation
+            reservations_details = []
+            for order in reservation_orders_data.get("value", []):
+                order_id = order.get("name")  # This is the reservationOrderId
+                reservations = order.get("properties", {}).get("reservations", [])
+                
+                for reservation in reservations:
+                    reservation_id = reservation.get("id", "").split("/")[-1]  # Extract reservation ID from full path
+                    
+                    # Get detailed reservation information
+                    reservation_detail_url = f"{self.base_url}{scope}/providers/Microsoft.Capacity/reservationOrders/{order_id}/reservations/{reservation_id}"
+                    reservation_detail_params = {"api-version": "2022-11-01"}
+                    
+                    reservation_detail_response = requests.get(
+                        reservation_detail_url,
+                        headers=headers,
+                        params=reservation_detail_params
+                    )
+                    reservation_detail_response.raise_for_status()
+                    reservation_detail = reservation_detail_response.json()
+                    
+                    reservations_details.append({
+                        "reservation_order_id": order_id,
+                        "reservation_id": reservation_id,
+                        "reservation_details": reservation_detail,
+                        "order_details": order
+                    })
+            
+            # Step 3: Get cost data for the reservation period
+            cost_url = f"{self.base_url}/providers/Microsoft.CostManagement/query"
+            cost_payload = {
                 "type": "Usage",
                 "timeframe": "Custom",
                 "timePeriod": {
@@ -73,36 +119,85 @@ class AzureReservationCost:
                 }
             }
             
-            response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            return response.json()
+            cost_response = requests.post(cost_url, headers=headers, json=cost_payload)
+            cost_response.raise_for_status()
+            cost_data = cost_response.json()
+            
+            return {
+                "reservation_orders": reservation_orders_data,
+                "reservations_details": reservations_details,
+                "cost_data": cost_data,
+                "period": {
+                    "start_date": start_date,
+                    "end_date": end_date
+                },
+                "total_reservations": len(reservations_details)
+            }
+            
         except requests.exceptions.RequestException as e:
             return {"error": f"Failed to fetch reservation utilization: {str(e)}"}
 
-    def get_reservation_recommendation(self, subscription_id: str) -> List[Dict[str, Any]]:
+    def get_reservation_recommendation(self, scope: str, api_version: str = "2024-08-01", filter_param: str = None) -> List[Dict[str, Any]]:
         """
         Get Azure reservation recommendations for various services.
 
+        This method retrieves reservation purchase recommendations based on your usage patterns.
+        You can filter recommendations by various criteria using OData filter syntax.
+
         Args:
-            subscription_id (str): Azure subscription ID
+            scope (str): Azure scope (subscription, resource group, etc.).
+                Example: "/subscriptions/{subscription-id}/"
+            api_version (str, optional): API version for the Consumption API. Defaults to "2024-08-01".
+            filter_param (str, optional): OData filter string for server-side filtering.
+                Common filter examples:
+                - "ResourceGroup eq 'MyResourceGroup'"
+                - "Location eq 'eastus'"
+                - "Sku eq 'Standard_D2s_v3'"
+                - "Term eq 'P1Y'" (1 year term)
+                - "Term eq 'P3Y'" (3 year term)
 
         Returns:
-            List[Dict[str, Any]]: List of reservation recommendations.
+            List[Dict[str, Any]]: List of reservation recommendations with details including:
+                - Resource group, location, SKU information
+                - Recommended quantity and term
+                - Potential savings
+                - Usage data used for recommendations
 
         Raises:
             requests.exceptions.RequestException: If Azure API call fails
+
+        Example:
+            >>> # Get all recommendations for a subscription
+            >>> recommendations = azure.get_reservation_recommendation(
+            ...     scope="/subscriptions/your-subscription-id/"
+            ... )
+            
+            >>> # Filter by resource group
+            >>> recommendations = azure.get_reservation_recommendation(
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     filter_param="ResourceGroup eq 'Production'"
+            ... )
+            
+            >>> # Filter by location and term
+            >>> recommendations = azure.get_reservation_recommendation(
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     filter_param="Location eq 'eastus' and Term eq 'P1Y'"
+            ... )
         """
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            url = f"{self.base_url}/providers/Microsoft.Consumption/reservationRecommendations"
+            url = f"{self.base_url}{scope}/providers/Microsoft.Consumption/reservationRecommendations"
+            params = {"api-version": api_version}
+            if filter_param:
+                params["$filter"] = filter_param
             
-            response = requests.get(url, headers=headers)
+            response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
             return response.json().get("value", [])
         except requests.exceptions.RequestException as e:
             return [{"error": f"Failed to fetch reservation recommendations: {str(e)}"}]
 
-    def get_azure_reservation_order_details(self) -> Dict[str, Any]:
+    def get_azure_reservation_order_details(self, api_version: str) -> Dict[str, Any]:
         """
         Get Azure reservation order details.
 
@@ -113,7 +208,8 @@ class AzureReservationCost:
             headers = {"Authorization": f"Bearer {self.token}"}
             url = f"{self.base_url}/providers/Microsoft.Capacity/reservationOrders"
             
-            response = requests.get(url, headers=headers)
+            params = {"api-version": api_version}
+            response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -379,7 +475,7 @@ class AzureCostManagement:
             if scope.startswith("/providers/Microsoft.Billing/billingAccounts"):
                 metrics = ["PreTaxCost"]
             else:
-                metrics = ["ActualCost"]
+                metrics = ["Cost"]
 
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
@@ -791,56 +887,223 @@ class AzureFinOpsGovernance:
         """
         self.subscription_id = subscription_id
         self.token = token
-        self.base_url = f"https://management.azure.com/subscriptions/{subscription_id}"
+        self.base_url = f"https://management.azure.com"
+        self.cost_client = AzureCostManagement(subscription_id, token)
 
-    def get_cost_allocation_tags(self) -> Dict[str, Any]:
+    def get_policy_compliance(self, scope: Optional[str] = None) -> Dict[str, Any]:
         """
-        Get cost allocation tags.
+        Get policy compliance status with focus on cost-related policies for FinOps governance.
+
+        Args:
+            scope (Optional[str]): Azure scope to check compliance for. 
+                If not provided, checks at subscription level.
 
         Returns:
-            Dict[str, Any]: Cost allocation tags
+            Dict[str, Any]: Policy compliance status with cost governance focus
         """
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            url = f"{self.base_url}/providers/Microsoft.CostManagement/tags"
             
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            return {"error": f"Failed to get cost allocation tags: {str(e)}"}
-
-    def get_policy_compliance(self) -> Dict[str, Any]:
-        """
-        Get policy compliance status.
-
-        Returns:
-            Dict[str, Any]: Policy compliance status
-        """
-        try:
-            headers = {"Authorization": f"Bearer {self.token}"}
-            url = f"{self.base_url}/providers/Microsoft.PolicyInsights/policyStates/latest/queryResults"
+            # Use provided scope or default to subscription
+            if not scope:
+                scope = f"/subscriptions/{self.subscription_id}"
             
-            response = requests.post(url, headers=headers)
+            url = f"{self.base_url}{scope}/providers/Microsoft.PolicyInsights/policyStates/latest/queryResults"
+            
+            # Only use api-version in params
+            params = {
+                "api-version": "2019-10-01"
+            }
+            
+            response = requests.post(url, headers=headers, params=params)
             response.raise_for_status()
-            return response.json()
+            policy_data = response.json()
+            
+            # Process and structure the response for FinOps relevance
+            compliance_summary = {
+                "scope": scope,
+                "total_policies": 0,
+                "compliant_resources": 0,
+                "non_compliant_resources": 0,
+                "cost_related_policies": [],
+                "compliance_score": 0.0,
+                "cost_governance_insights": []
+            }
+            
+            # Extract policy states and analyze for cost relevance
+            policy_states = policy_data.get("value", [])
+            cost_related_categories = [
+                "Cost Management", "Tagging", "Resource Management", 
+                "Budget", "Quota", "Sizing", "Reservation"
+            ]
+            
+            for policy_state in policy_states:
+                policy_name = policy_state.get("policyDefinitionName", "")
+                policy_category = policy_state.get("policyDefinitionGroupNames", [])
+                compliance_state = policy_state.get("complianceState", "")
+                
+                # Check if policy is cost-related (by name or group/category)
+                is_cost_related = any(
+                    category.lower() in policy_name.lower() or 
+                    any(cat.lower() in str(policy_category).lower() for cat in cost_related_categories)
+                    for category in cost_related_categories
+                )
+                
+                if is_cost_related:
+                    compliance_summary["cost_related_policies"].append({
+                        "policy_name": policy_name,
+                        "compliance_state": compliance_state,
+                        "category": policy_category,
+                        "resource_count": policy_state.get("resourceCount", 0)
+                    })
+                
+                # Count compliance
+                if compliance_state == "Compliant":
+                    compliance_summary["compliant_resources"] += policy_state.get("resourceCount", 0)
+                else:
+                    compliance_summary["non_compliant_resources"] += policy_state.get("resourceCount", 0)
+            
+            compliance_summary["total_policies"] = len(compliance_summary["cost_related_policies"])
+            
+            # Calculate compliance score
+            total_resources = compliance_summary["compliant_resources"] + compliance_summary["non_compliant_resources"]
+            if total_resources > 0:
+                compliance_summary["compliance_score"] = (
+                    compliance_summary["compliant_resources"] / total_resources * 100
+                )
+            
+            # Generate cost governance insights
+            if compliance_summary["total_policies"] > 0:
+                non_compliant_policies = [
+                    p for p in compliance_summary["cost_related_policies"] 
+                    if p["compliance_state"] != "Compliant"
+                ]
+                
+                if non_compliant_policies:
+                    compliance_summary["cost_governance_insights"].append(
+                        f"Found {len(non_compliant_policies)} non-compliant cost policies that may impact cost management"
+                    )
+                
+                if compliance_summary["compliance_score"] < 80:
+                    compliance_summary["cost_governance_insights"].append(
+                        f"Low compliance score ({compliance_summary['compliance_score']:.1f}%) may indicate cost governance issues"
+                    )
+                else:
+                    compliance_summary["cost_governance_insights"].append(
+                        f"Good compliance score ({compliance_summary['compliance_score']:.1f}%) indicates effective cost governance"
+                    )
+            
+            return compliance_summary
+            
         except requests.exceptions.RequestException as e:
             return {"error": f"Failed to get policy compliance: {str(e)}"}
 
-    def get_cost_policies(self) -> Dict[str, Any]:
+    def get_available_tags(self, scope: str) -> Dict[str, Any]:
         """
-        Get cost management policies.
+        Get available resource tags for a given scope.
+        
+        Args:
+            scope (str): Azure scope (subscription, resource group, etc.)
+
+        Returns:
+            Dict[str, Any]: Available resource tags for the scope
+        """
+        try:
+            api_version = '2024-08-01'
+            headers = {"Authorization": f"Bearer {self.token}"}
+            url = f"{self.base_url}{scope}/providers/Microsoft.Consumption/tags"
+            params = {"api-version": api_version}
+            
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            return {"error": f"Failed to get available tags: {str(e)}"}
+
+    def get_costs_by_tags(self, scope: str, tag_names: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Get costs grouped by tags for cost allocation analysis.
+        
+        Note: Azure Cost Management API has limited support for grouping by custom tags.
+        This method will return available tags and cost data grouped by supported dimensions.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, etc.)
+            tag_names (Optional[List[str]]): List of tag names to group by. 
+                Note: Custom tags are not directly supported by Azure Cost Management API.
+
+        Returns:
+            Dict[str, Any]: Cost data and available tags with explanation of limitations
+
+        Example:
+            >>> # Get available tags and cost data
+            >>> azure.get_costs_by_tags(
+            ...     scope="/subscriptions/your-subscription-id/"
+            ... )
+        """
+        try:
+            # Get available tags
+            available_tags = self.get_available_tags(scope)
+            if "error" in available_tags:
+                return available_tags
+            
+            # Extract tag names from the response
+            tag_data = available_tags.get("properties", {}).get("tags", [])
+            discovered_tags = []
+            for tag_item in tag_data:
+                if "key" in tag_item:
+                    discovered_tags.append(tag_item["key"])
+            
+            # Get cost data grouped by supported dimensions instead of custom tags
+            # Azure supports: ResourceGroup, ResourceType, ServiceName, etc.
+            supported_groupings = ["ResourceGroup", "ServiceName", "ResourceType"]
+            
+            cost_data = self.cost_client.get_cost_data(
+                scope,
+                group_by=supported_groupings
+            )
+            
+            return {
+                "cost_allocation_by_tags": cost_data,
+                "available_tags": available_tags,
+                "discovered_tags": discovered_tags,
+                "tags_used": tag_names if tag_names else discovered_tags,
+                "supported_groupings": supported_groupings,
+                "scope": scope,
+                "note": "Azure Cost Management API doesn't support direct grouping by custom tags. Using supported dimensions instead."
+            }
+            
+        except Exception as e:
+            return {"error": f"Failed to get costs by tags: {str(e)}"}
+
+    def get_cost_policies(self, scope: str) -> Dict[str, Any]:
+        """
+        Get cost management policies (filtered for cost-related only).
 
         Returns:
             Dict[str, Any]: Cost policies
         """
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            url = f"{self.base_url}/providers/Microsoft.Authorization/policyDefinitions"
-            
-            response = requests.get(url, headers=headers)
+            url = f"{self.base_url}{scope}/providers/Microsoft.Authorization/policyDefinitions"
+            params = {"api-version": "2023-04-01"}
+            response = requests.get(url, headers=headers, params=params)
             response.raise_for_status()
-            return response.json()
+            all_policies = response.json().get("value", [])
+
+            # Filter for cost-related policies
+            cost_keywords = ["cost", "budget", "tag", "quota", "spend", "billing", "reservation"]
+            cost_policies = []
+            for policy in all_policies:
+                display_name = policy.get("properties", {}).get("displayName", "").lower()
+                description = policy.get("properties", {}).get("description", "").lower()
+                if any(keyword in display_name or keyword in description for keyword in cost_keywords):
+                    cost_policies.append(policy)
+
+            return {
+                "total_cost_policies": len(cost_policies),
+                "cost_policies": cost_policies
+            }
         except requests.exceptions.RequestException as e:
             return {"error": f"Failed to get cost policies: {str(e)}"}
 
@@ -858,111 +1121,242 @@ class AzureFinOpsAnalytics:
         """
         self.subscription_id = subscription_id
         self.token = token
-        self.base_url = f"https://management.azure.com/subscriptions/{subscription_id}"
+        self.base_url = f"https://management.azure.com"
+        self.cost_client = AzureCostManagement(subscription_id, token)
 
     def get_cost_forecast(
         self,
-        start_date: str,
-        end_date: str,
-        forecast_period: int = 12
+        scope: str,
+        api_version: str,
+        start_date: str = None,
+        end_date: str = None,
+        forecast_period: int = 12,
+        payload: dict = None
     ) -> Dict[str, Any]:
         """
         Get cost forecast for the specified period.
-
-        Args:
-            start_date (str): Start date for historical data
-            end_date (str): End date for historical data
-            forecast_period (int): Number of months to forecast
-
-        Returns:
-            Dict[str, Any]: Cost forecast data
         """
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
-            url = f"{self.base_url}/providers/Microsoft.CostManagement/forecast"
-            
-            payload = {
-                "timeframe": "Custom",
-                "timePeriod": {
-                    "from": start_date,
-                    "to": end_date
-                },
-                "dataset": {
-                    "granularity": "Monthly",
-                    "aggregation": {
-                        "totalCost": {
-                            "name": "PreTaxCost",
-                            "function": "Sum"
+            url = f"{self.base_url}{scope}/providers/Microsoft.CostManagement/forecast"
+
+            # Clean default date logic
+            if not start_date or not end_date:
+                today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+                start_date_dt = (today.replace(day=1) - relativedelta(months=3))
+                start_date = start_date_dt.strftime("%Y-%m-%dT00:00:00+00:00")
+                end_date = today.strftime("%Y-%m-%dT00:00:00+00:00")
+
+            if not payload:
+                payload = {
+                        "type": "Usage",
+                    "timeframe": "Custom",
+                    "timePeriod": {
+                        "from": start_date,
+                        "to": end_date
+                    },
+                    "dataset": {
+                            "granularity": "Daily",
+                        "aggregation": {
+                            "totalCost": {
+                                    "name": "Cost",
+                                "function": "Sum"
+                            }
                         }
                     }
                 }
-            }
             
-            response = requests.post(url, headers=headers, json=payload)
+            params = {"api-version": api_version}
+            response = requests.post(url, headers=headers, params=params, json=payload)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            return {"error": f"Failed to get cost forecast: {str(e)}"}
+            return {
+                "status code": getattr(e.response, 'status_code', None),
+                "Response": getattr(e.response, 'text', str(e)),
+                "error": f"Failed to get cost forecast: {str(e)}"
+            }
 
-    def get_cost_anomalies(self) -> Dict[str, Any]:
+    def get_cost_anomalies(
+        self,
+        scope: str,
+        start_date: str = None,
+        end_date: str = None,
+        api_version: str = "2023-03-01",
+        payload: dict = None
+    ) -> Dict[str, Any]:
         """
-        Get cost anomalies.
+        Get cost anomalies using Azure Cost Management query API.
+        
+        This method uses the Azure Cost Management query API to analyze cost data
+        and identify potential anomalies based on cost patterns and trends.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            start_date (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to 30 days ago.
+            end_date (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
+            api_version (str, optional): API version for the Cost Management API.
+            payload (dict, optional): Custom payload for the query. If not provided, uses default payload.
 
         Returns:
-            Dict[str, Any]: Cost anomalies data
+            Dict[str, Any]: Cost analysis with potential anomalies identified.
         """
         try:
-            # Azure Cost Anomaly Detection would be implemented here
-            # For now, return a placeholder structure
-            return {
-                "anomalies": [
-                    {
-                        "anomaly_id": "anomaly-456",
-                        "service": "Virtual Machines",
-                        "cost_impact": 200.00,
-                        "detection_date": "2024-01-15"
+            # Set default dates if not provided
+            if not start_date or not end_date:
+                today = datetime.utcnow()
+                end_date = today.strftime("%Y-%m-%d")
+                start_date = (today - timedelta(days=30)).strftime("%Y-%m-%d")
+
+            headers = {"Authorization": f"Bearer {self.token}"}
+            url = f"{self.base_url}{scope}/providers/Microsoft.CostManagement/query"
+            params = {"api-version": api_version}
+            
+            # Use custom payload if provided, otherwise use default
+            if not payload:
+                payload = {
+                    "type": "Usage",
+                    "timeframe": "Custom",
+                    "timePeriod": {
+                        "from": start_date,
+                        "to": end_date
+                    },
+                    "dataset": {
+                        "granularity": "Daily",
+                        "aggregation": {
+                            "totalCost": {
+                                "name": "Cost",
+                                "function": "Sum"
+                            }
+                        }
                     }
-                ]
+                }
+            
+            response = requests.post(url, headers=headers, params=params, json=payload)
+            response.raise_for_status()
+            cost_data = response.json()
+            
+            # Analyze the cost data for anomalies
+            anomalies = self._detect_anomalies(cost_data, start_date, end_date)
+            
+            return {
+                "scope": scope,
+                "period": {"start": start_date, "end": end_date},
+                "anomalies": anomalies,
+                "total_records": len(anomalies),
+                "cost_data": cost_data
             }
+            
         except Exception as e:
             return {"error": f"Failed to get cost anomalies: {str(e)}"}
 
-    def get_cost_efficiency_metrics(self) -> Dict[str, Any]:
+    def _detect_anomalies(self, cost_data: Dict[str, Any], start_date: str, end_date: str) -> List[Dict[str, Any]]:
         """
-        Get cost efficiency metrics.
+        Analyze cost data to detect anomalies based on statistical patterns.
+        
+        Args:
+            cost_data (Dict[str, Any]): Cost data from Azure Cost Management API
+            start_date (str): Start date of analysis period
+            end_date (str): End date of analysis period
 
         Returns:
-            Dict[str, Any]: Cost efficiency metrics
+            List[Dict[str, Any]]: List of detected anomalies
         """
+        anomalies = []
+        
         try:
-            # Calculate efficiency metrics based on cost data
-            return {
-                "efficiency_metrics": {
-                    "cost_per_user": 30.25,
-                    "cost_per_transaction": 0.20,
-                    "utilization_rate": 0.80,
-                    "waste_percentage": 0.20
-                }
-            }
+            # Extract cost values from the response
+            properties = cost_data.get("properties", {})
+            rows = properties.get("rows", [])
+            columns = properties.get("columns", [])
+            
+            if not rows or not columns:
+                return anomalies
+            
+            # Find cost column index
+            cost_col_idx = None
+            date_col_idx = None
+            for idx, col in enumerate(columns):
+                name = col.get("name", "").lower()
+                if name in ["cost", "pretaxcost", "costusd"]:
+                    cost_col_idx = idx
+                elif "date" in name:
+                    date_col_idx = idx
+            
+            if cost_col_idx is None:
+                return anomalies
+            
+            # Extract daily costs
+            daily_costs = []
+            for row in rows:
+                if len(row) > max(cost_col_idx, date_col_idx or 0):
+                    cost = float(row[cost_col_idx]) if row[cost_col_idx] else 0.0
+                    date = row[date_col_idx] if date_col_idx is not None else None
+                    daily_costs.append({"date": date, "cost": cost})
+            
+            if len(daily_costs) < 3:
+                return anomalies
+            
+            # Calculate statistical measures for anomaly detection
+            costs = [day["cost"] for day in daily_costs]
+            mean_cost = sum(costs) / len(costs)
+            variance = sum((cost - mean_cost) ** 2 for cost in costs) / len(costs)
+            std_dev = variance ** 0.5
+            
+            # Define anomaly threshold (2 standard deviations from mean)
+            threshold = 2 * std_dev
+            
+            # Detect anomalies
+            for day in daily_costs:
+                cost = day["cost"]
+                deviation = abs(cost - mean_cost)
+                
+                if deviation > threshold and cost > 0:
+                    anomaly_type = "spike" if cost > mean_cost else "drop"
+                    severity = "high" if deviation > 3 * std_dev else "medium"
+                    
+                    anomalies.append({
+                        "date": day["date"],
+                        "cost": cost,
+                        "expected_cost": round(mean_cost, 2),
+                        "deviation": round(deviation, 2),
+                        "deviation_percentage": round((deviation / mean_cost * 100) if mean_cost > 0 else 0, 2),
+                        "type": anomaly_type,
+                        "severity": severity,
+                        "threshold": round(threshold, 2)
+                    })
+            
+            # Sort anomalies by deviation (highest first)
+            anomalies.sort(key=lambda x: x["deviation"], reverse=True)
+            
         except Exception as e:
-            return {"error": f"Failed to get cost efficiency metrics: {str(e)}"}
+            # If anomaly detection fails, return empty list
+            pass
+        
+        return anomalies
 
-    def generate_cost_report(
+    def get_cost_efficiency_metrics(
         self,
-        report_type: str = "monthly",
+        scope: str,
         start_date: Optional[str] = None,
-        end_date: Optional[str] = None
+        end_date: Optional[str] = None,
+        user_count: Optional[int] = None,
+        transaction_count: Optional[int] = None,
+        api_version: str = "2023-03-01"
     ) -> Dict[str, Any]:
         """
-        Generate comprehensive cost report.
-
+        Calculate real cost efficiency metrics from Azure Cost Management API.
+        
         Args:
-            report_type (str): Type of report (monthly, quarterly, annual)
-            start_date (Optional[str]): Start date for report
-            end_date (Optional[str]): End date for report
-
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            start_date (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to first day of current month.
+            end_date (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
+            user_count (int, optional): Number of users for cost per user calculation
+            transaction_count (int, optional): Number of transactions for cost per transaction calculation
+            api_version (str, optional): API version for the Cost Management API
+            
         Returns:
-            Dict[str, Any]: Cost report
+            Dict[str, Any]: Cost efficiency metrics with detailed breakdown
         """
         try:
             if not start_date or not end_date:
@@ -970,18 +1364,213 @@ class AzureFinOpsAnalytics:
                 start_date = today.replace(day=1).strftime("%Y-%m-%d")
                 end_date = today.strftime("%Y-%m-%d")
 
-            cost_data = self.get_cost_data(
+            # Use the cost_client to get cost data
+            cost_data = self.cost_client.get_cost_data(
+                scope,
                 start_date=start_date,
                 end_date=end_date,
-                granularity="Monthly"
+                granularity="Daily",
+                metrics=["Cost"],
+                group_by=["ServiceName"]
+            )
+            
+            if isinstance(cost_data, dict) and "error" in cost_data:
+                return cost_data
+            
+            # Process cost data
+            total_cost = 0.0
+            cost_by_service = {}
+            daily_costs = []
+            
+            properties = cost_data.get("properties", {})
+            rows = properties.get("rows", [])
+            columns = properties.get("columns", [])
+            
+            # Find cost and service column indices
+            cost_col_idx = None
+            service_col_idx = None
+            date_col_idx = None
+            
+            for idx, col in enumerate(columns):
+                name = col.get("name", "").lower()
+                if name in ["actualcost", "cost", "pretaxcost"]:
+                    cost_col_idx = idx
+                elif "service" in name:
+                    service_col_idx = idx
+                elif "date" in name:
+                    date_col_idx = idx
+            
+            if cost_col_idx is None:
+                return {"error": "Could not find cost column in response"}
+            
+            # Process rows to calculate metrics
+            for row in rows:
+                if len(row) > max(cost_col_idx, service_col_idx or 0, date_col_idx or 0):
+                    cost = float(row[cost_col_idx]) if row[cost_col_idx] else 0.0
+                    service = row[service_col_idx] if service_col_idx is not None else "Unknown"
+                    date = row[date_col_idx] if date_col_idx is not None else None
+                    
+                    total_cost += cost
+                    
+                    # Track cost by service
+                    if service not in cost_by_service:
+                        cost_by_service[service] = 0.0
+                    cost_by_service[service] += cost
+                    
+                    # Track daily costs for variance calculation
+                    if date:
+                        daily_costs.append({"date": date, "cost": cost})
+            
+            # Calculate efficiency metrics
+            efficiency_metrics = {
+                "total_cost": round(total_cost, 2),
+                "cost_by_service": {k: round(v, 2) for k, v in cost_by_service.items()},
+                "period": {"start": start_date, "end": end_date},
+                "total_days_analyzed": len(daily_costs) if daily_costs else 0
+            }
+            
+            # Calculate per-user and per-transaction metrics if provided
+            if user_count and user_count > 0:
+                efficiency_metrics["cost_per_user"] = round(total_cost / user_count, 2)
+            
+            if transaction_count and transaction_count > 0:
+                efficiency_metrics["cost_per_transaction"] = round(total_cost / transaction_count, 4)
+            
+            # Calculate variance and efficiency score if we have daily data
+            if daily_costs:
+                costs = [day["cost"] for day in daily_costs]
+                avg_daily_cost = sum(costs) / len(costs)
+                variance = sum((cost - avg_daily_cost) ** 2 for cost in costs) / len(costs)
+                std_dev = variance ** 0.5
+                
+                efficiency_metrics.update({
+                    "avg_daily_cost": round(avg_daily_cost, 2),
+                    "cost_stddev": round(std_dev, 2),
+                    "cost_variance_ratio": round(std_dev / avg_daily_cost if avg_daily_cost > 0 else 0, 3)
+                })
+                
+                # Calculate efficiency score (lower variance = higher efficiency)
+                if avg_daily_cost > 0:
+                    variance_ratio = std_dev / avg_daily_cost
+                    efficiency_score = max(0, min(1, 1 - (variance_ratio * 0.5)))
+                    efficiency_metrics["cost_efficiency_score"] = round(efficiency_score, 3)
+                
+                # Estimate waste (days with cost > 1.5x average)
+                waste_days = len([cost for cost in costs if cost > avg_daily_cost * 1.5])
+                waste_percentage = (waste_days / len(costs)) * 100 if costs else 0
+                
+                efficiency_metrics.update({
+                    "waste_days": waste_days,
+                    "waste_percentage": round(waste_percentage, 1)
+                })
+            
+            return {"efficiency_metrics": efficiency_metrics}
+            
+        except Exception as e:
+            return {"error": f"Failed to calculate cost efficiency metrics: {str(e)}"}
+
+    def generate_cost_report(
+        self,
+        scope: str,
+        report_type: str = "monthly",
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        metrics: Optional[list] = None,
+        group_by: Optional[list] = None,
+        filter_: Optional[dict] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate comprehensive cost report for a given Azure scope, with optional metrics, group_by, and filter parameters.
+        The report_type parameter controls the default date range and aggregation:
+            - 'monthly': current month (default)
+            - 'quarterly': last 3 months
+            - 'annual': last 12 months
+        If start_date/end_date are provided, they override report_type defaults.
+        For 'quarterly' and 'annual', a summary aggregation by quarter/year is included in the result.
+
+        Args:
+            scope (str): Azure scope (required). Examples:
+                - Subscription: "/subscriptions/{subscription-id}/"
+                - Resource Group: "/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/"
+                - Billing Account: "/providers/Microsoft.Billing/billingAccounts/{billing-account-id}"
+            report_type (str): Type of report (monthly, quarterly, annual)
+            start_date (Optional[str]): Start date for report
+            end_date (Optional[str]): End date for report
+            metrics (Optional[list]): List of cost metrics to aggregate (e.g., ["Cost"])
+            group_by (Optional[list]): List of dimensions to group by (e.g., ["ServiceName"])
+            filter_ (Optional[dict]): Additional filter criteria for the query
+
+        Returns:
+            Dict[str, Any]: Cost report, including summary for quarterly/annual types
+        """
+        from collections import defaultdict
+        try:
+            today = datetime.today()
+            if not start_date or not end_date:
+                if report_type == "monthly":
+                    start_date = today.replace(day=1).strftime("%Y-%m-%d")
+                    end_date = today.strftime("%Y-%m-%d")
+                elif report_type == "quarterly":
+                    start_date = (today.replace(day=1) - relativedelta(months=2)).strftime("%Y-%m-%d")
+                    end_date = today.strftime("%Y-%m-%d")
+                elif report_type == "annual":
+                    start_date = (today.replace(day=1) - relativedelta(months=11)).strftime("%Y-%m-%d")
+                    end_date = today.strftime("%Y-%m-%d")
+                else:
+                    start_date = today.replace(day=1).strftime("%Y-%m-%d")
+                    end_date = today.strftime("%Y-%m-%d")
+
+            # Always use monthly granularity for summary reports
+            granularity = "Monthly"
+
+            cost_data = self.cost_client.get_cost_data(
+                scope,
+                start_date=start_date,
+                end_date=end_date,
+                granularity=granularity,
+                metrics=metrics,
+                group_by=group_by,
+                filter_=filter_
             )
 
-            return {
+            # Post-process for quarterly/annual summary
+            summary = None
+            if report_type in ("quarterly", "annual") and isinstance(cost_data, dict):
+                # Azure returns columns/rows; find date and cost columns
+                properties = cost_data.get("properties", {})
+                columns = properties.get("columns", [])
+                rows = properties.get("rows", [])
+                date_col_idx = None
+                cost_col_idx = None
+                for idx, col in enumerate(columns):
+                    name = col.get("name", "").lower()
+                    if "date" in name or "billingmonth" in name:
+                        date_col_idx = idx
+                    if name in ["cost", "actualcost", "pretaxcost"]:
+                        cost_col_idx = idx
+                # Aggregate by quarter or year
+                agg = defaultdict(float)
+                for row in rows:
+                    if date_col_idx is not None and cost_col_idx is not None:
+                        date_str = row[date_col_idx]
+                        cost = float(row[cost_col_idx]) if row[cost_col_idx] else 0.0
+                        dt = datetime.strptime(date_str[:10], "%Y-%m-%d")
+                        if report_type == "quarterly":
+                            quarter = f"Q{((dt.month-1)//3)+1}-{dt.year}"
+                            agg[quarter] += cost
+                        elif report_type == "annual":
+                            agg[str(dt.year)] += cost
+                summary = dict(agg)
+
+            result = {
                 "report_type": report_type,
                 "period": {"start": start_date, "end": end_date},
                 "cost_data": cost_data,
                 "generated_at": datetime.now().isoformat()
             }
+            if summary is not None:
+                result["summary"] = summary
+            return result
         except Exception as e:
             return {"error": f"Failed to generate cost report: {str(e)}"}
 

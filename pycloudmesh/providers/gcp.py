@@ -37,11 +37,11 @@ class GCPReservationCost:
         Get GCP reservation utilization and cost data using BigQuery billing export.
 
         Args:
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
             start_date (Optional[str]): Start date in YYYY-MM-DD format. Defaults to first day of current month.
             end_date (Optional[str]): End date in YYYY-MM-DD format. Defaults to last day of current month.
-            bq_project_id (Optional[str]): BigQuery project ID for billing export.
-            bq_dataset (Optional[str]): BigQuery dataset name for billing export.
-            bq_table (Optional[str]): BigQuery table name for billing export.
 
         Returns:
             Dict[str, Any]: Reservation utilization data from GCP Billing.
@@ -508,15 +508,16 @@ class GCPCostManagement:
 
     def get_cost_data(
         self,
+        bq_project_id: str,
+        bq_dataset: str,
+        bq_table: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         granularity: str = "Monthly",
         metrics: Optional[List[str]] = None,
         group_by: Optional[List[str]] = None,
         filter_: Optional[Dict[str, Any]] = None,
-        bq_project_id: Optional[str] = None,
-        bq_dataset: Optional[str] = None,
-        bq_table: Optional[str] = None
+        
     ) -> Dict[str, Any]:
         """
         Fetch GCP cost data from BigQuery billing export.
@@ -535,9 +536,7 @@ class GCPCostManagement:
         Returns:
             Dict[str, Any]: Cost data from GCP Billing.
         """
-        import os
         from google.cloud import bigquery
-        # Set defaults
         if not start_date or not end_date:
             today = datetime.today()
             start_date = today.replace(day=1).strftime("%Y-%m-%d")
@@ -547,16 +546,12 @@ class GCPCostManagement:
         if not group_by:
             group_by = ["service.description"]
 
-        # BigQuery config (use arguments, then env, then self.project_id)
-        bq_project = bq_project_id or os.environ.get("BQ_PROJECT_ID", self.project_id)
-        bq_dataset = bq_dataset or os.environ.get("BQ_DATASET")
-        bq_table = bq_table or os.environ.get("BQ_TABLE")
+        bq_project = bq_project_id
         if not (bq_project and bq_dataset and bq_table):
             return {"error": "BigQuery billing export table not configured. Pass bq_project_id, bq_dataset, and bq_table to get_cost_data."}
 
         client = bigquery.Client(project=bq_project, credentials=self.credentials)
 
-        # Build SELECT and GROUP BY
         select_fields = []
         group_fields = []
         for field in group_by:
@@ -564,7 +559,6 @@ class GCPCostManagement:
             group_fields.append(field)
         select_fields.append("SUM(cost) as total_cost")
 
-        # Build WHERE
         where_clauses = [
             f"usage_start_time >= '{start_date}'",
             f"usage_end_time <= '{end_date}'"
@@ -573,7 +567,6 @@ class GCPCostManagement:
             for k, v in filter_.items():
                 where_clauses.append(f"{k} = '{v}'")
 
-        # Build query
         query = f"""
             SELECT {', '.join(select_fields)}
             FROM `{bq_project}.{bq_dataset}.{bq_table}`
@@ -607,9 +600,11 @@ class GCPCostManagement:
         Get detailed cost analysis with dimensions.
 
         Args:
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
             start_date (Optional[str]): Start date for analysis
             end_date (Optional[str]): End date for analysis
-            dimensions (Optional[List[str]]): List of dimensions to analyze
 
         Returns:
             Dict[str, Any]: Cost analysis data
@@ -636,9 +631,9 @@ class GCPCostManagement:
         Get cost trends over time.
 
         Args:
-            bq_project_id (str): BigQuery project ID for billing export.
-            bq_dataset (str): BigQuery dataset name for billing export.
-            bq_table (str): BigQuery table name for billing export.
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
             start_date (str, optional): Start date for trend analysis (in kwargs).
             end_date (str, optional): End date for trend analysis (in kwargs).
 
@@ -667,9 +662,9 @@ class GCPCostManagement:
 
         Args:
             resource_name (str): Name/ID of the resource to get costs for.
-            bq_project_id (str): BigQuery project ID for billing export.
-            bq_dataset (str): BigQuery dataset name for billing export.
-            bq_table (str): BigQuery table name for billing export.
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
             start_date (str, optional): Start date for cost data (in kwargs).
             end_date (str, optional): End date for cost data (in kwargs).
 
@@ -1253,9 +1248,9 @@ class GCPFinOpsAnalytics:
         Flags days as anomalies based on the ARIMA_PLUS model's prediction intervals.
 
         Args:
-            bq_project_id (str): BigQuery project ID for billing export.
-            bq_dataset (str): BigQuery dataset name for billing export.
-            bq_table (str): BigQuery table name for billing export.
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
             start_date (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to 60 days ago.
             end_date (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
             anomaly_prob_threshold (float, optional): Probability threshold for anomaly detection. Default: 0.95.
@@ -1348,9 +1343,9 @@ class GCPFinOpsAnalytics:
         Automatically chooses the best approach based on data characteristics.
 
         Args:
-            bq_project_id (str): BigQuery project ID for billing export.
-            bq_dataset (str): BigQuery dataset name for billing export.
-            bq_table (str): BigQuery table name for billing export.
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
             start_date (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to 30 days ago.
             end_date (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
             use_ml (bool, optional): Whether to attempt ML-based analysis. Default: True.
@@ -1537,9 +1532,9 @@ class GCPFinOpsAnalytics:
         Generate comprehensive cost report using BigQuery billing export data.
 
         Args:
-            bq_project_id (str): BigQuery project ID for billing export.
-            bq_dataset (str): BigQuery dataset name for billing export.
-            bq_table (str): BigQuery table name for billing export.
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
             report_type (str): Type of report (monthly, quarterly, annual, custom)
             start_date (Optional[str]): Start date for report (YYYY-MM-DD)
             end_date (Optional[str]): End date for report (YYYY-MM-DD)
@@ -1752,3 +1747,96 @@ class GCPFinOpsAnalytics:
 
         except Exception as e:
             return {"error": f"Failed to generate cost report: {str(e)}"}
+
+    def get_cost_forecast_bqml(
+        self,
+        bq_project_id: str,
+        bq_dataset: str,
+        bq_table: str,
+        start_date: str = None,
+        end_date: str = None,
+        forecast_period: int = 12
+    ) -> dict:
+        """
+        Forecast future costs using BigQuery ML ARIMA_PLUS model.
+
+        Args:
+            bq_project_id (str): BigQuery project ID for billing export (required).
+            bq_dataset (str): BigQuery dataset name for billing export (required).
+            bq_table (str): BigQuery table name for billing export (required).
+            start_date (str, optional): Start date for training data (YYYY-MM-DD). Defaults to 90 days ago.
+            end_date (str, optional): End date for training data (YYYY-MM-DD). Defaults to today.
+            forecast_period (int, optional): Number of days to forecast. Defaults to 12.
+
+        Returns:
+            dict: Forecasted cost values, confidence intervals, and model info.
+        """
+        from google.cloud import bigquery
+        from datetime import datetime, timedelta
+
+        today = datetime.today()
+        if not end_date:
+            end_date = today.strftime("%Y-%m-%d")
+        if not start_date:
+            start_date = (today - timedelta(days=90)).strftime("%Y-%m-%d")
+
+        model_id = f"{bq_project_id}.{bq_dataset}.cost_forecast_model"
+        client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
+
+        train_query = f"""
+            CREATE OR REPLACE MODEL `{model_id}`
+            OPTIONS(
+              model_type='ARIMA_PLUS',
+              time_series_timestamp_col='day',
+              time_series_data_col='total_cost'
+            ) AS
+            SELECT
+              DATE(usage_start_time) AS day,
+              SUM(cost) AS total_cost
+            FROM
+              `{bq_project_id}.{bq_dataset}.{bq_table}`
+            WHERE
+              usage_start_time >= '{start_date}'
+              AND usage_end_time <= '{end_date}'
+            GROUP BY day
+            ORDER BY day
+        """
+        try:
+            client.query(train_query).result()
+        except Exception as e:
+            return {"error": f"Failed to train BigQuery ML model: {str(e)}"}
+
+        forecast_query = f"""
+            SELECT
+              forecast_timestamp,
+              forecast_value,
+              prediction_interval_lower_bound,
+              prediction_interval_upper_bound
+            FROM
+              ML.FORECAST(MODEL `{model_id}`,
+                STRUCT({forecast_period} AS horizon, 0.9 AS confidence_level))
+            ORDER BY forecast_timestamp
+        """
+        try:
+            forecast_job = client.query(forecast_query)
+            forecast_rows = list(forecast_job)
+        except Exception as e:
+            return {"error": f"Failed to forecast costs from BigQuery ML model: {str(e)}"}
+
+        forecast_results = [
+            {
+                "date": row["forecast_timestamp"].strftime("%Y-%m-%d"),
+                "forecast_value": float(row["forecast_value"]),
+                "lower_bound": float(row["prediction_interval_lower_bound"]),
+                "upper_bound": float(row["prediction_interval_upper_bound"])
+            }
+            for row in forecast_rows
+        ]
+
+        return {
+            "forecast_period": forecast_period,
+            "start_date": start_date,
+            "end_date": end_date,
+            "forecast_results": forecast_results,
+            "message": f"Forecast generated for {forecast_period} days using BigQuery ML ARIMA_PLUS model."
+        }

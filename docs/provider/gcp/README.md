@@ -243,29 +243,22 @@ budget = gcp.create_budget(
 ---
 
 ### get_budget_alerts
-Gets threshold rules and alert info for a specific budget (requires Cloud Monitoring setup for actual notifications).
 
-**Signature:**
-```python
-def get_budget_alerts(
-    self,
-    billing_account: str,
-    budget_display_name: str
-) -> Dict[str, Any]:
-```
+Retrieve all alerts configured for a specific GCP budget.
 
 **Parameters:**
-- `billing_account` (str): GCP billing account ID.
-- `budget_display_name` (str): Display name of the budget.
+- `billing_account` (str): GCP billing account ID (required)
+- `budget_display_name` (str): Display name of the budget (required)
 
 **Returns:**
-- Budget threshold rules and a message about alerting (or error if not found).
+A dictionary with budget alert information, or an error message.
 
 **Example:**
 ```python
+gcp = gcp_client("your_project_id", "/path/to/credentials.json")
 alerts = gcp.get_budget_alerts(
-    billing_account="your-billing-account",
-    budget_display_name="Monthly GCP Budget"
+    billing_account="012345-678901-ABCDEF",
+    budget_display_name="monthly-budget"
 )
 print(alerts)
 ```

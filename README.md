@@ -71,12 +71,13 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 
 **Azure:**  
 [ list_budgets ](docs/provider/azure/README.md#list_budgets)  
-[ create_budget ](docs/provider/azure/README.md#create_budget)  
+[ create_budget ](docs/provider/azure/README.md#create_budget)
 [ get_budget ](docs/provider/azure/README.md#get_budget)
 
 **GCP:**  
 [ list_budgets ](docs/provider/gcp/README.md#list_budgets)  
-[ create_budget ](docs/provider/gcp/README.md#create_budget)
+[ create_budget ](docs/provider/gcp/README.md#create_budget)  
+[ get_budget_alerts ](docs/provider/gcp/README.md#get_budget_alerts)
 
 ### 3. Optimization & Recommendations
 
@@ -88,7 +89,7 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 [ get_idle_resources ](docs/provider/aws/README.md#get_idle_resources)
 
 **Azure:**  
-[ get_advisor_recommendations ](docs/provider/azure/README.md#get_advisor_recommendations)  
+[ get_advisor_recommendations ](docs/provider/azure/README.md#get_advisor_recommendations)
 [ get_optimization_recommendations ](docs/provider/azure/README.md#get_optimization_recommendations)  
 [ get_reserved_instance_recommendations ](docs/provider/azure/README.md#get_reserved_instance_recommendations)
 

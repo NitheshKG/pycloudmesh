@@ -97,15 +97,130 @@ class AWSProvider(CloudProvider):
     
     # Core FinOps Features
     def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS reservation utilization and cost data.
+
+        This method retrieves reservation utilization and cost data from AWS Cost Explorer,
+        providing insights into how effectively your reservations are being used.
+
+        Args:
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to one month before today.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY", "MONTHLY", or "HOURLY". Defaults to "MONTHLY".
+
+        Returns:
+            Dict[str, Any]: Reservation utilization data from AWS Cost Explorer including:
+                - Reservation utilization metrics
+                - Cost data for reservation period
+                - Reservation order details
+                - Individual reservation information
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_reservation_cost(
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="MONTHLY"
+            ... )
+        """
         return self.reservation_client.get_reservation_cost(**kwargs)
     
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS reservation purchase recommendations.
+
+        This method provides reservation purchase recommendations for various AWS services
+        using Cost Explorer, helping you identify cost optimization opportunities.
+
+        Args:
+            Service (str, optional): AWS service name. Defaults to "AmazonEC2".
+                Common values: "AmazonEC2", "AmazonRDS", "AmazonElastiCache", etc.
+            LookbackPeriodInDays (str, optional): Lookback period for analysis.
+                One of "SEVEN_DAYS", "THIRTY_DAYS", "SIXTY_DAYS". Defaults to "SIXTY_DAYS".
+            TermInYears (str, optional): Reservation term. One of "ONE_YEAR", "THREE_YEARS". Defaults to "ONE_YEAR".
+            PaymentOption (str, optional): Payment option. One of "NO_UPFRONT", "PARTIAL_UPFRONT", "ALL_UPFRONT". Defaults to "NO_UPFRONT".
+            AccountScope (str, optional): Account scope. One of "PAYER", "LINKED". Defaults to "PAYER".
+            AccountId (str, optional): AWS Account ID for specific account analysis.
+            NextPageToken (str, optional): Token for pagination.
+            PageSize (int, optional): Page size for pagination.
+            Filter (dict, optional): Filter criteria for recommendations.
+            ServiceSpecification (dict, optional): Service-specific specifications.
+
+        Returns:
+            Dict[str, Any]: Reservation purchase recommendations from AWS Cost Explorer including:
+                - Recommended reservation purchases
+                - Potential savings estimates
+                - Usage analysis data
+                - Service-specific recommendations
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_reservation_recommendation(
+            ...     Service="AmazonEC2",
+            ...     LookbackPeriodInDays="THIRTY_DAYS",
+            ...     TermInYears="ONE_YEAR",
+            ...     PaymentOption="NO_UPFRONT"
+            ... )
+        """
         return self.reservation_client.get_reservation_recommendation(**kwargs)
     
     def get_reservation_coverage(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS reservation coverage data.
+
+        This method retrieves reservation coverage data from AWS Cost Explorer,
+        showing how much of your usage is covered by reservations.
+
+        Args:
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to 30 days ago.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY" or "MONTHLY". Defaults to "MONTHLY".
+            GroupBy (list, optional): List of grouping dicts for analysis.
+            Filter (dict, optional): Filter criteria for the coverage data.
+            NextPageToken (str, optional): Token for pagination.
+
+        Returns:
+            Dict[str, Any]: Reservation coverage data from AWS Cost Explorer including:
+                - Coverage metrics by time period
+                - Reservation utilization percentages
+                - Coverage breakdown by service/region
+                - Uncovered usage analysis
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_reservation_coverage(
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="DAILY",
+            ...     GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}]
+            ... )
+        """
         return self.reservation_client.get_reservation_coverage(**kwargs)
     
     def list_budgets(self, **kwargs) -> Dict[str, Any]:
+        """
+        List AWS budgets for an account.
+
+        This method retrieves all budgets configured for the specified AWS account,
+        including budget details and pagination information.
+
+        Args:
+            aws_account_id (str): AWS account ID (required).
+            aws_max_results (int, optional): Maximum number of results to return.
+            aws_next_token (str, optional): Token for pagination.
+
+        Returns:
+            Dict[str, Any]: List of budgets and pagination information from AWS including:
+                - Budgets: List of budget objects with details
+                - NextToken: Token for pagination (if more results available)
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.list_budgets(
+            ...     aws_account_id="123456789012",
+            ...     aws_max_results=10
+            ... )
+        """
         return self.budget_client.list_budgets(
             kwargs.get('aws_account_id'),
             max_results=kwargs.get('aws_max_results'),
@@ -113,6 +228,37 @@ class AWSProvider(CloudProvider):
         )
     
     def get_cost_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Fetch AWS cost data for a given period and dimensions using Cost Explorer.
+
+        Args:
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY", "MONTHLY", or "HOURLY". Defaults to "MONTHLY".
+            metrics (list, optional): List of cost metrics to aggregate. Defaults to ["UnblendedCost"].
+                Common values: "UnblendedCost", "BlendedCost", "AmortizedCost", "NetAmortizedCost", "UsageQuantity", etc.
+            group_by (list, optional): List of grouping dicts, e.g., [{"Type": "DIMENSION", "Key": "SERVICE"}].
+                See AWS Cost Explorer docs for valid dimensions.
+            filter_ (dict, optional): Additional filter criteria for the query (see AWS Cost Explorer filter syntax).
+
+        Returns:
+            Dict[str, Any]: Cost data from AWS Cost Explorer. If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_cost_data(
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="MONTHLY",
+            ...     metrics=["UnblendedCost"],
+            ...     group_by=[{"Type": "DIMENSION", "Key": "SERVICE"}],
+            ...     filter_={
+            ...         "Dimensions": {
+            ...             "Key": "REGION",
+            ...             "Values": ["us-east-1"]
+            ...         }
+            ...     }
+            ... )
+        """
         return self.cost_client.get_aws_cost_data(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
@@ -123,6 +269,38 @@ class AWSProvider(CloudProvider):
         )
     
     def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost analysis with insights and breakdowns for AWS.
+
+        This method provides comprehensive cost analysis including cost breakdowns by service,
+        top services by cost, cost trends, and actionable insights.
+
+        Args:
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            dimensions (list, optional): List of dimensions to analyze (max 2). Defaults to ["SERVICE", "REGION"].
+                Common values: "SERVICE", "REGION", "USAGE_TYPE", "LINKED_ACCOUNT", "OPERATION", etc.
+
+        Returns:
+            Dict[str, Any]: Cost analysis with insights, breakdowns, and trends.
+                {
+                    "period": {"start": ..., "end": ...},
+                    "dimensions": [...],
+                    "total_cost": ...,
+                    "cost_breakdown": {...},
+                    "top_services": [...],
+                    "cost_trends": [...],
+                    "insights": [...]
+                }
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_cost_analysis(
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     dimensions=["SERVICE", "REGION"]
+            ... )
+        """
         return self.cost_client.get_aws_cost_analysis(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
@@ -130,9 +308,88 @@ class AWSProvider(CloudProvider):
         )
     
     def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost trends analysis with insights and patterns for AWS.
+
+        This method provides comprehensive cost trend analysis including growth rates,
+        peak periods, patterns, and actionable insights.
+
+        Args:
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY", "MONTHLY", or "HOURLY". Defaults to "DAILY".
+            metrics (list, optional): List of cost metrics to analyze. Defaults to ["UnblendedCost"].
+            group_by (list, optional): List of grouping dicts for analysis.
+            filter_ (dict, optional): Additional filter criteria for the query.
+            sort_by (list, optional): Sorting criteria for the results.
+
+        Returns:
+            Dict[str, Any]: Cost trends analysis with patterns, growth rates, and insights.
+                {
+                    "period": {"start": ..., "end": ...},
+                    "granularity": ...,
+                    "total_periods": ...,
+                    "total_cost": ...,
+                    "average_daily_cost": ...,
+                    "cost_periods": [...],
+                    "trend_direction": ...,
+                    "growth_rate": ...,
+                    "peak_periods": [...],
+                    "low_periods": [...],
+                    "patterns": [...],
+                    "insights": [...]
+                }
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_cost_trends(
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="DAILY",
+            ...     group_by=[{"Type": "DIMENSION", "Key": "SERVICE"}]
+            ... )
+        """
         return self.cost_client.get_aws_cost_trends(**kwargs)
     
     def get_resource_costs(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost analysis for a specific AWS resource.
+
+        This method provides comprehensive cost analysis for a specific resource including
+        cost breakdowns, utilization insights, and optimization recommendations.
+
+        Args:
+            resource_id (str, required): ID of the resource to get costs for.
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY", "MONTHLY", or "HOURLY". Defaults to "DAILY".
+
+        Returns:
+            Dict[str, Any]: Detailed resource cost analysis with insights and breakdowns.
+                {
+                    "resource_id": ...,
+                    "resource_type": ...,
+                    "period": {"start": ..., "end": ...},
+                    "granularity": ...,
+                    "total_cost": ...,
+                    "total_periods": ...,
+                    "active_periods": ...,
+                    "cost_periods": [...],
+                    "cost_breakdown": {...},
+                    "utilization_insights": [...],
+                    "cost_trends": [...],
+                    "recommendations": [...]
+                }
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_resource_costs(
+            ...     resource_id="i-1234567890abcdef0",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="DAILY"
+            ... )
+        """
         return self.cost_client.get_aws_resource_costs(
             resource_id=kwargs.get('resource_id'),
             start_date=kwargs.get('start_date'),
@@ -142,29 +399,235 @@ class AWSProvider(CloudProvider):
     
     # Advanced FinOps Features
     def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get comprehensive optimization recommendations for AWS.
+
+        This method provides optimization recommendations including savings plans,
+        reservations, rightsizing, and idle resources.
+
+        Args:
+            **kwargs: Additional parameters for specific optimization types.
+
+        Returns:
+            Dict[str, Any]: Optimization recommendations including:
+                - 'savings_plans': Savings Plans recommendations
+                - 'reservations': Reserved Instance recommendations
+                - 'rightsizing': Rightsizing recommendations
+                - 'idle_resources': Idle resource recommendations
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_optimization_recommendations()
+        """
         return self.optimization_client.get_optimization_recommendations()
     
     def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get cost forecast for the specified period using AWS Cost Explorer.
+
+        This method provides cost forecasting capabilities with support for various
+        parameters and ensures required parameters are present with sensible defaults.
+
+        Args:
+            TimePeriod (dict, optional): Time period for forecast. If not provided, defaults to future period.
+            Metric (str, optional): Cost metric for forecasting. Defaults to "UNBLENDED_COST".
+            Granularity (str, optional): Data granularity. Defaults to "MONTHLY".
+            Filter (dict, optional): Filter criteria for the forecast.
+            BillingViewArn (str, optional): Billing view ARN for the forecast.
+            PredictionIntervalLevel (int, optional): Prediction interval level.
+
+        Returns:
+            Dict[str, Any]: Cost forecast data from AWS Cost Explorer.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_cost_forecast(
+            ...     TimePeriod={"Start": "2024-02-01", "End": "2024-03-01"},
+            ...     Metric="UNBLENDED_COST",
+            ...     Granularity="MONTHLY"
+            ... )
+        """
         return self.analytics_client.get_cost_forecast(**kwargs)
     
     def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get cost anomalies using AWS Cost Explorer.
+
+        This method identifies cost anomalies with support for various parameters
+        and ensures required parameters are present with sensible defaults.
+
+        Args:
+            DateInterval (dict, optional): Date interval for anomaly detection. If not provided, defaults to last month.
+            MonitorArn (str, optional): Monitor ARN for specific anomaly monitoring.
+            Feedback (str, optional): Feedback for anomaly detection.
+            TotalImpact (dict, optional): Total impact criteria for anomalies.
+            NextPageToken (str, optional): Token for pagination.
+            MaxResults (int, optional): Maximum number of results to return.
+
+        Returns:
+            Dict[str, Any]: Cost anomalies data from AWS Cost Explorer.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_cost_anomalies(
+            ...     DateInterval={"StartDate": "2024-01-01", "EndDate": "2024-01-31"},
+            ...     MaxResults=10
+            ... )
+        """
         return self.analytics_client.get_cost_anomalies(**kwargs)
     
     def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
+        """
+        Calculate cost efficiency metrics from AWS Cost Explorer.
+
+        This method calculates real cost efficiency metrics with support for various
+        parameters and ensures required parameters are present with sensible defaults.
+
+        Args:
+            user_count (int, optional): Number of users for cost per user calculation.
+            transaction_count (int, optional): Number of transactions for cost per transaction calculation.
+            TimePeriod (dict, optional): Time period for analysis. If not provided, defaults to current month.
+            Granularity (str, optional): Data granularity. Defaults to "MONTHLY".
+            Metrics (list, optional): List of cost metrics. Defaults to ["UnblendedCost"].
+            GroupBy (list, optional): Grouping criteria. Defaults to [{"Type": "DIMENSION", "Key": "SERVICE"}].
+            Filter (dict, optional): Filter criteria for the analysis.
+            BillingViewArn (str, optional): Billing view ARN for the analysis.
+            NextPageToken (str, optional): Token for pagination.
+
+        Returns:
+            Dict[str, Any]: Cost efficiency metrics including:
+                - 'total_cost': Total cost for the period
+                - 'cost_by_service': Cost breakdown by service
+                - 'waste_estimate': Estimated waste cost
+                - 'cost_per_user': Cost per user (if user_count provided)
+                - 'cost_per_transaction': Cost per transaction (if transaction_count provided)
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_cost_efficiency_metrics(
+            ...     user_count=100,
+            ...     transaction_count=1000,
+            ...     TimePeriod={"Start": "2024-01-01", "End": "2024-01-31"}
+            ... )
+        """
         return self.analytics_client.get_cost_efficiency_metrics(**kwargs)
     
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
+        """
+        Generate comprehensive cost report using AWS Cost Explorer.
+
+        This method generates comprehensive cost reports with support for various
+        parameters and ensures required parameters are present with sensible defaults.
+
+        Args:
+            report_type (str, optional): Type of report (monthly, quarterly, annual). Defaults to "monthly".
+            TimePeriod (dict, optional): Time period for the report. If not provided, defaults to current month.
+            Granularity (str, optional): Data granularity. Defaults to "MONTHLY".
+            Metrics (list, optional): List of cost metrics. Defaults to ["UnblendedCost"].
+            GroupBy (list, optional): Grouping criteria. Defaults to [{"Type": "DIMENSION", "Key": "SERVICE"}].
+            Filter (dict, optional): Filter criteria for the report.
+            BillingViewArn (str, optional): Billing view ARN for the report.
+            NextPageToken (str, optional): Token for pagination.
+
+        Returns:
+            Dict[str, Any]: Comprehensive cost report including:
+                - 'report_type': Type of report generated
+                - 'period': Time period covered
+                - 'total_cost': Total cost for the period
+                - 'cost_by_service': Cost breakdown by service
+                - 'generated_at': Timestamp of report generation
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.generate_cost_report(
+            ...     report_type="monthly",
+            ...     TimePeriod={"Start": "2024-01-01", "End": "2024-01-31"},
+            ...     GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}]
+            ... )
+        """
         return self.analytics_client.generate_cost_report(**kwargs)
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get governance policies and compliance status for AWS.
+
+        This method retrieves cost allocation tags, compliance status, and cost-related policies.
+
+        Args:
+            ResourceId (str, optional): Resource ID for cost allocation tags.
+            ConfigRuleName (str, optional): Config rule name for compliance status.
+
+        Returns:
+            Dict[str, Any]: Governance policies and compliance information including:
+                - 'cost_allocation_tags': Cost allocation tags
+                - 'compliance_status': Compliance status for cost policies
+                - 'cost_policies': Cost-related governance policies
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_governance_policies(
+            ...     ResourceId="arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0",
+            ...     ConfigRuleName="cost-optimization-rule"
+            ... )
+        """
         return {
             'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(**kwargs),
             'compliance_status': self.governance_client.get_compliance_status(**kwargs),
             'cost_policies': self.governance_client.get_cost_policies(**kwargs)
         }
     
-    # AWS-specific additional methods
     def create_budget(self, **kwargs) -> Dict[str, Any]:
+        """
+        Create a new AWS budget.
+
+        This method creates a budget in AWS for the specified account, with support for notifications and custom budget types.
+
+        Args:
+            aws_account_id (str): AWS account ID (required).
+            budget_name (str): Name of the budget (required).
+            budget_amount (float): Budget amount in USD (required).
+            budget_type (str, optional): Type of budget. One of "COST", "USAGE", "RI_UTILIZATION", "RI_COVERAGE".
+                Defaults to "COST".
+            time_unit (str, optional): Time unit for the budget. One of "MONTHLY", "QUARTERLY", "ANNUALLY".
+                Defaults to "MONTHLY".
+            notifications_with_subscribers (list, optional): List of notification dicts for budget alerts.
+                Each dict should contain:
+                    - Notification: {
+                        "NotificationType": "ACTUAL" or "FORECASTED",
+                        "ComparisonOperator": "GREATER_THAN" or "LESS_THAN" or "EQUAL_TO",
+                        "Threshold": float (percentage),
+                        "ThresholdType": "PERCENTAGE" or "ABSOLUTE_VALUE"
+                      }
+                    - Subscribers: [
+                        {"SubscriptionType": "EMAIL", "Address": "user@example.com"},
+                        ...
+                      ]
+
+        Returns:
+            Dict[str, Any]: AWS response for budget creation. If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.create_budget(
+            ...     aws_account_id="123456789012",
+            ...     budget_name="monthly-budget",
+            ...     budget_amount=1000.0,
+            ...     budget_type="COST",
+            ...     time_unit="MONTHLY",
+            ...     notifications_with_subscribers=[
+            ...         {
+            ...             "Notification": {
+            ...                 "NotificationType": "ACTUAL",
+            ...                 "ComparisonOperator": "GREATER_THAN",
+            ...                 "Threshold": 80.0,
+            ...                 "ThresholdType": "PERCENTAGE"
+            ...             },
+            ...             "Subscribers": [
+            ...                 {"SubscriptionType": "EMAIL", "Address": "admin@example.com"}
+            ...             ]
+            ...         }
+            ...     ]
+            ... )
+        """
         return self.budget_client.create_budget(
             account_id=kwargs.get('aws_account_id'),
             budget_name=kwargs.get('budget_name'),
@@ -175,21 +638,123 @@ class AWSProvider(CloudProvider):
         )
     
     def get_budget_notifications(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get notifications for a specific AWS budget.
+
+        This method retrieves all notifications configured for a specific budget.
+
+        Args:
+            aws_account_id (str): AWS account ID (required).
+            budget_name (str): Name of the budget (required).
+
+        Returns:
+            Dict[str, Any]: Budget notifications from AWS. If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_budget_notifications(
+            ...     aws_account_id="123456789012",
+            ...     budget_name="monthly-budget"
+            ... )
+        """
         return self.budget_client.get_budget_notifications(
             account_id=kwargs.get('aws_account_id'),
             budget_name=kwargs.get('budget_name')
         )
     
     def get_savings_plans_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS Savings Plans recommendations.
+
+        This method provides Savings Plans purchase recommendations with support for various parameters.
+
+        Args:
+            SavingsPlansType (str, optional): Type of Savings Plans. Defaults to "COMPUTE_SP".
+            AccountScope (str, optional): Account scope. Defaults to "PAYER".
+            LookbackPeriodInDays (str, optional): Lookback period. Defaults to "THIRTY_DAYS".
+            TermInYears (str, optional): Term in years. Defaults to "ONE_YEAR".
+            PaymentOption (str, optional): Payment option. Defaults to "NO_UPFRONT".
+            NextPageToken (str, optional): Token for pagination.
+            PageSize (int, optional): Page size for pagination.
+            Filter (dict, optional): Filter criteria for recommendations.
+
+        Returns:
+            Dict[str, Any]: Savings Plans recommendations from AWS Cost Explorer.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_savings_plans_recommendations(
+            ...     SavingsPlansType="COMPUTE_SP",
+            ...     TermInYears="ONE_YEAR",
+            ...     PaymentOption="NO_UPFRONT"
+            ... )
+        """
         return self.optimization_client._get_savings_plans_recommendations(**kwargs)
     
     def get_rightsizing_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS rightsizing recommendations.
+
+        This method provides rightsizing recommendations for EC2 instances and other resources.
+
+        Args:
+            **kwargs: Additional parameters for rightsizing recommendations.
+
+        Returns:
+            Dict[str, Any]: Rightsizing recommendations from AWS.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_rightsizing_recommendations()
+        """
         return self.optimization_client._get_rightsizing_recommendations(**kwargs)
     
     def get_idle_resources(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS idle resource recommendations.
+
+        This method identifies idle or underutilized resources that could be stopped or downsized.
+
+        Args:
+            **kwargs: Additional parameters for idle resource detection.
+
+        Returns:
+            Dict[str, Any]: Idle resource recommendations from AWS.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_idle_resources()
+        """
         return self.optimization_client.get_idle_resources(**kwargs)
     
     def get_reservation_purchase_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get AWS Reserved Instance purchase recommendations.
+
+        This method provides Reserved Instance purchase recommendations with support for various parameters.
+
+        Args:
+            AccountScope (str, optional): Account scope. Defaults to "PAYER".
+            LookbackPeriodInDays (str, optional): Lookback period. Defaults to "THIRTY_DAYS".
+            TermInYears (str, optional): Term in years. Defaults to "ONE_YEAR".
+            PaymentOption (str, optional): Payment option. Defaults to "NO_UPFRONT".
+            Service (str, optional): Service name. Defaults to "Amazon Elastic Compute Cloud - Compute".
+            AccountId (str, optional): AWS account ID.
+            NextPageToken (str, optional): Token for pagination.
+            PageSize (int, optional): Page size for pagination.
+            Filter (dict, optional): Filter criteria for recommendations.
+            ServiceSpecification (dict, optional): Service specification details.
+
+        Returns:
+            Dict[str, Any]: Reserved Instance recommendations from AWS Cost Explorer.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> aws.get_reservation_purchase_recommendations(
+            ...     Service="Amazon Elastic Compute Cloud - Compute",
+            ...     TermInYears="ONE_YEAR",
+            ...     PaymentOption="NO_UPFRONT"
+            ... )
+        """
         return self.optimization_client._get_reservation_purchase_recommendations(**kwargs)
 
 
@@ -203,11 +768,102 @@ class AzureProvider(CloudProvider):
         self.analytics_client = AzureFinOpsAnalytics(subscription_id, token)
     
     # Core FinOps Features
-    def get_reservation_cost(self) -> Dict[str, Any]:
-        return self.reservation_client.get_reservation_cost()
+    def get_reservation_cost(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get Azure reservation utilization and cost data.
+
+        This method retrieves reservation utilization and cost data from Azure Cost Management,
+        providing insights into how effectively your reservations are being used.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, etc.).
+                Example: "/subscriptions/{subscription-id}/"
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to last day of current month.
+
+        Returns:
+            Dict[str, Any]: Reservation utilization data from Azure Cost Management including:
+                - Reservation utilization metrics
+                - Cost data for reservation period
+                - Reservation order details
+                - Individual reservation information
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> # Get reservation costs for a subscription with default date range
+            >>> azure.get_reservation_cost(
+            ...     scope="/subscriptions/your-subscription-id/"
+            ... )
+            
+            >>> # Get reservation costs for a specific date range
+            >>> azure.get_reservation_cost(
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     start_date="2024-06-01",
+            ...     end_date="2024-06-30"
+            ... )
+            
+            >>> # Get reservation costs for a resource group
+            >>> azure.get_reservation_cost(
+            ...     scope="/subscriptions/your-subscription-id/resourceGroups/your-rg/"
+            ... )
+        """
+        return self.reservation_client.get_reservation_cost(
+            scope,
+            start_date=kwargs.get('start_date'),
+            end_date=kwargs.get('end_date')
+            )
     
-    def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
-        return self.reservation_client.get_reservation_recommendation(kwargs.get('subscription_id'))
+    def get_reservation_recommendation(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get Azure reservation recommendations for various services.
+
+        This method retrieves reservation purchase recommendations based on your usage patterns.
+        You can filter recommendations by various criteria using OData filter syntax.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, etc.).
+                Example: "/subscriptions/{subscription-id}/"
+            filter (str, optional): OData filter string for server-side filtering.
+                Common filter examples:
+                - "ResourceGroup eq 'MyResourceGroup'"
+                - "Location eq 'eastus'"
+                - "Sku eq 'Standard_D2s_v3'"
+                - "Term eq 'P1Y'" (1 year term)
+                - "Term eq 'P3Y'" (3 year term)
+            api_version (str, optional): API version for the Consumption API. Defaults to "2024-08-01".
+
+        Returns:
+            List[Dict[str, Any]]: List of reservation recommendations with details including:
+                - Resource group, location, SKU information
+                - Recommended quantity and term
+                - Potential savings
+                - Usage data used for recommendations
+
+        Example:
+            >>> # Get all recommendations for a subscription
+            >>> recommendations = azure.get_reservation_recommendation(
+            ...     scope="/subscriptions/your-subscription-id/"
+            ... )
+            
+            >>> # Filter by resource group
+            >>> recommendations = azure.get_reservation_recommendation(
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     filter="ResourceGroup eq 'Production'"
+            ... )
+            
+            >>> # Filter by location and term
+            >>> recommendations = azure.get_reservation_recommendation(
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     filter="Location eq 'eastus' and Term eq 'P1Y'"
+            ... )
+        """
+        filter_param = kwargs.get('filter')
+        api_version = kwargs.get('api_version', '2024-08-01')
+        return self.reservation_client.get_reservation_recommendation(
+            scope=scope,
+            api_version=api_version,
+            filter_param=filter_param
+        )
     
     def get_cost_data(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
@@ -364,36 +1020,180 @@ class AzureProvider(CloudProvider):
             metrics=kwargs.get('metrics')
         )
     
-    def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
+    def get_cost_forecast(self, scope, **kwargs) -> Dict[str, Any]:
+        api_version = kwargs.get('api_version') or kwargs.get('api-version') or "2025-03-01"
         return self.analytics_client.get_cost_forecast(
+            scope=scope,
+            api_version=api_version,
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            forecast_period=kwargs.get('forecast_period', 12)
+            forecast_period=kwargs.get('forecast_period', 12),
+            payload=kwargs.get('payload')
         )
     
-    def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_anomalies()
+    def get_cost_anomalies(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Get cost anomalies using Azure Cost Management query API.
+        
+        This method uses the Azure Cost Management query API to analyze cost data
+        and identify potential anomalies based on cost patterns and trends.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            start_date (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to 30 days ago.
+            end_date (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
+            api_version (str, optional): API version for the Cost Management API.
+            payload (dict, optional): Custom payload for the query. If not provided, uses default payload.
+
+        Returns:
+            Dict[str, Any]: Cost analysis with potential anomalies identified.
+        """
+        return self.analytics_client.get_cost_anomalies(
+            scope=scope,
+            start_date=kwargs.get('start_date'),
+            end_date=kwargs.get('end_date'),
+            api_version=kwargs.get('api_version', '2023-03-01'),
+            payload=kwargs.get('payload')
+        )
     
-    def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
-        return self.analytics_client.get_cost_efficiency_metrics()
+    def get_cost_efficiency_metrics(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Calculate real cost efficiency metrics from Azure Cost Management API.
+        
+        Args:
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+            start_date (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to first day of current month.
+            end_date (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
+            user_count (int, optional): Number of users for cost per user calculation
+            transaction_count (int, optional): Number of transactions for cost per transaction calculation
+            api_version (str, optional): API version for the Cost Management API
+            
+        Returns:
+            Dict[str, Any]: Cost efficiency metrics with detailed breakdown
+        """
+        return self.analytics_client.get_cost_efficiency_metrics(
+            scope=scope,
+            start_date=kwargs.get('start_date'),
+            end_date=kwargs.get('end_date'),
+            user_count=kwargs.get('user_count'),
+            transaction_count=kwargs.get('transaction_count'),
+            api_version=kwargs.get('api_version', '2023-03-01')
+        )
     
-    def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
+    def generate_cost_report(self, scope: str, **kwargs) -> Dict[str, Any]:
+        """
+        Generate a comprehensive cost report for a given Azure scope.
+
+        Args:
+            scope (str): Azure scope (required). Examples:
+                - Subscription: "/subscriptions/{subscription-id}/"
+                - Resource Group: "/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/"
+                - Billing Account: "/providers/Microsoft.Billing/billingAccounts/{billing-account-id}"
+            report_type (str, optional): Type of report ("monthly", "quarterly", "annual"). Defaults to "monthly".
+            start_date (str, optional): Start date for the report (YYYY-MM-DD). If not provided, defaults based on report_type.
+            end_date (str, optional): End date for the report (YYYY-MM-DD). If not provided, defaults based on report_type.
+            metrics (list, optional): List of cost metrics to aggregate (e.g., ["Cost"]).
+            group_by (list, optional): List of dimensions to group by (e.g., ["ServiceName"]).
+            filter_ (dict, optional): Additional filter criteria for the query.
+
+        Returns:
+            Dict[str, Any]: Cost report, including summary for quarterly/annual types and raw cost data as returned by Azure Cost Management API.
+        """
         return self.analytics_client.generate_cost_report(
+            scope=scope,
             report_type=kwargs.get('report_type', 'monthly'),
             start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date')
+            end_date=kwargs.get('end_date'),
+            metrics=kwargs.get('metrics'),
+            group_by=kwargs.get('group_by'),
+            filter_=kwargs.get('filter_')
         )
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get Azure governance policies and compliance status for cost management.
+
+        This method returns a dictionary containing:
+            - cost allocation by tags (costs grouped by supported Azure dimensions and available tags)
+            - policy compliance status (focused on cost-related policies)
+            - cost-related governance policies (filtered for FinOps relevance)
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, etc.).
+                Example: "/subscriptions/{subscription-id}/"
+            tag_names (List[str], optional): List of tag names to use for cost allocation analysis.
+                If not provided, all available tags will be used.
+
+        Returns:
+            Dict[str, Any]: Dictionary with keys:
+                - 'cost_allocation_by_tags': Cost allocation analysis grouped by tags/dimensions
+                - 'policy_compliance': Compliance status for cost-related policies
+                - 'cost_policies': List of cost-related governance policies
+
+        Example:
+            >>> azure.get_governance_policies(
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     tag_names=["Environment", "Project"]
+            ... )
+        """
+        scope = kwargs.get('scope')
+        tag_names = kwargs.get('tag_names')
         return {
-            'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(**kwargs),
-            'policy_compliance': self.governance_client.get_policy_compliance(**kwargs),
-            'cost_policies': self.governance_client.get_cost_policies(**kwargs)
+            'cost_allocation_by_tags': self.governance_client.get_costs_by_tags(scope, tag_names),
+            'policy_compliance': self.governance_client.get_policy_compliance(scope=scope),
+            'cost_policies': self.governance_client.get_cost_policies(scope=scope)
         }
     
-    # Azure-specific additional methods
-    def get_reservation_order_details(self) -> Dict[str, Any]:
-        return self.reservation_client.get_azure_reservation_order_details()
+    def get_costs_by_tags(self, scope: str, tag_names: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Get costs grouped by tags for cost allocation analysis.
+        
+        If tag_names is not provided, this method will automatically discover
+        available tags for the scope and use them for cost allocation.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, etc.)
+            tag_names (Optional[List[str]]): List of tag names to group by. 
+                If None, will automatically discover available tags.
+
+        Returns:
+            Dict[str, Any]: Cost data grouped by tag values and available tags
+
+        Example:
+            >>> # Use specific tags
+            >>> azure.get_costs_by_tags(
+            ...     scope="/subscriptions/your-subscription-id/",
+            ...     tag_names=["Environment", "Project"]
+            ... )
+            
+            >>> # Auto-discover and use available tags
+            >>> azure.get_costs_by_tags(
+            ...     scope="/subscriptions/your-subscription-id/"
+            ... )
+        """
+        return self.governance_client.get_costs_by_tags(scope, tag_names)
+    
+    def get_reservation_order_details(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get Azure reservation order details.
+
+        This method retrieves details for all reservation orders in the Azure account,
+        including metadata and properties for each reservation order.
+
+        Args:
+            api_version (str, optional): API version for the Azure Reservation API.
+                Defaults to "2022-11-01".
+
+        Returns:
+            Dict[str, Any]: Reservation order details as returned by the Azure API.
+                If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> azure.get_reservation_order_details()
+            >>> azure.get_reservation_order_details(api_version="2022-11-01")
+        """
+        api_version = kwargs.get('api_version', '2022-11-01')
+        return self.reservation_client.get_azure_reservation_order_details(api_version=api_version)
     
     def list_budgets(self, 
                      scope: str,
@@ -600,6 +1400,37 @@ class GCPProvider(CloudProvider):
     
     # Core FinOps Features
     def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get GCP reservation utilization and cost data.
+
+        This method retrieves reservation utilization and cost data from GCP BigQuery,
+        providing insights into how effectively your reservations are being used.
+
+        Args:
+            bq_project_id (str): BigQuery project ID for cost data analysis (required).
+            bq_dataset (str): BigQuery dataset containing cost data (required).
+            bq_table (str): BigQuery table containing cost data (required).
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to last day of current month.
+
+        Returns:
+            Dict[str, Any]: Reservation utilization data from GCP BigQuery including:
+                - Reservation utilization metrics
+                - Cost data for reservation period
+                - Reservation order details
+                - Individual reservation information
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> # Get reservation costs with BigQuery data
+            >>> gcp.get_reservation_cost(
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data",
+            ...     start_date="2024-06-01",
+            ...     end_date="2024-06-30"
+            ... )
+        """
         return self.reservation_client.get_reservation_cost(
             bq_project_id=kwargs.get('bq_project_id'),
             bq_dataset=kwargs.get('bq_dataset'),
@@ -609,15 +1440,88 @@ class GCPProvider(CloudProvider):
         )
     
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get GCP reservation purchase recommendations.
+
+        This method provides reservation purchase recommendations for various GCP services
+        using BigQuery cost data, helping you identify cost optimization opportunities.
+
+        Args:
+            **kwargs: Additional parameters for reservation recommendations.
+
+        Returns:
+            Dict[str, Any]: Reservation purchase recommendations from GCP including:
+                - Recommended reservation purchases
+                - Potential savings estimates
+                - Usage analysis data
+                - Service-specific recommendations
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_reservation_recommendation()
+        """
         return self.reservation_client.get_reservation_recommendation()
     
     def list_budgets(self, **kwargs) -> Dict[str, Any]:
+        """
+        List GCP budgets for a billing account.
+
+        This method retrieves all budgets configured for the specified GCP billing account,
+        including budget details and pagination information.
+
+        Args:
+            gcp_billing_account (str, optional): GCP billing account ID.
+            gcp_max_results (int, optional): Maximum number of results to return.
+
+        Returns:
+            Dict[str, Any]: List of budgets and pagination information from GCP including:
+                - Budgets: List of budget objects with details
+                - NextPageToken: Token for pagination (if more results available)
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.list_budgets(
+            ...     gcp_billing_account="012345-678901-ABCDEF",
+            ...     gcp_max_results=10
+            ... )
+        """
         return self.budget_client.list_budgets(
             billing_account=kwargs.get('gcp_billing_account'),
             max_results=kwargs.get('gcp_max_results'),
         )
     
     def get_cost_data(self, **kwargs) -> Dict[str, Any]:
+        """
+        Fetch GCP cost data for a given period and dimensions using BigQuery.
+
+        This method retrieves cost data from GCP BigQuery for analysis and reporting.
+
+        Args:
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY", "MONTHLY", or "HOURLY". Defaults to "MONTHLY".
+            metrics (list, optional): List of cost metrics to aggregate. Defaults to ["cost"].
+                Common values: "cost", "usage", "credits", etc.
+            group_by (list, optional): List of grouping criteria for analysis.
+            filter_ (dict, optional): Additional filter criteria for the query.
+            bq_project_id (str): BigQuery project ID for cost data analysis.
+            bq_dataset (str): BigQuery dataset containing cost data.
+            bq_table (str): BigQuery table containing cost data.
+
+        Returns:
+            Dict[str, Any]: Cost data from GCP BigQuery. If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_cost_data(
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="MONTHLY",
+            ...     metrics=["cost"],
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data"
+            ... )
+        """
         return self.cost_client.get_cost_data(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
@@ -635,6 +1539,40 @@ class GCPProvider(CloudProvider):
                         bq_dataset: str, 
                         bq_table: str,
                         **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost analysis with insights and breakdowns for GCP.
+
+        This method provides comprehensive cost analysis including cost breakdowns by service,
+        top services by cost, cost trends, and actionable insights using BigQuery data.
+
+        Args:
+            bq_project_id (str): BigQuery project ID for cost data analysis (required).
+            bq_dataset (str): BigQuery dataset containing cost data (required).
+            bq_table (str): BigQuery table containing cost data (required).
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+
+        Returns:
+            Dict[str, Any]: Cost analysis with insights, breakdowns, and trends.
+                {
+                    "period": {"start": ..., "end": ...},
+                    "total_cost": ...,
+                    "cost_breakdown": {...},
+                    "top_services": [...],
+                    "cost_trends": [...],
+                    "insights": [...]
+                }
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_cost_analysis(
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31"
+            ... )
+        """
         return self.cost_client.get_cost_analysis(
             bq_project_id=bq_project_id,
             bq_dataset=bq_dataset,
@@ -648,6 +1586,48 @@ class GCPProvider(CloudProvider):
                         bq_dataset: str, 
                         bq_table: str,
                         **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost trends analysis with insights and patterns for GCP.
+
+        This method provides comprehensive cost trend analysis including growth rates,
+        peak periods, patterns, and actionable insights using BigQuery data.
+
+        Args:
+            bq_project_id (str): BigQuery project ID for cost data analysis (required).
+            bq_dataset (str): BigQuery dataset containing cost data (required).
+            bq_table (str): BigQuery table containing cost data (required).
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY", "MONTHLY", or "HOURLY". Defaults to "DAILY".
+
+        Returns:
+            Dict[str, Any]: Cost trends analysis with patterns, growth rates, and insights.
+                {
+                    "period": {"start": ..., "end": ...},
+                    "granularity": ...,
+                    "total_periods": ...,
+                    "total_cost": ...,
+                    "average_daily_cost": ...,
+                    "cost_periods": [...],
+                    "trend_direction": ...,
+                    "growth_rate": ...,
+                    "peak_periods": [...],
+                    "low_periods": [...],
+                    "patterns": [...],
+                    "insights": [...]
+                }
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_cost_trends(
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="DAILY"
+            ... )
+        """
         return self.cost_client.get_cost_trends(
             bq_project_id=bq_project_id,
             bq_dataset=bq_dataset,
@@ -661,6 +1641,50 @@ class GCPProvider(CloudProvider):
                            bq_dataset: str, 
                            bq_table: str,
                            **kwargs) -> Dict[str, Any]:
+        """
+        Get detailed cost analysis for a specific GCP resource.
+
+        This method provides comprehensive cost analysis for a specific resource including
+        cost breakdowns, utilization insights, and optimization recommendations using BigQuery data.
+
+        Args:
+            resource_name (str): Name of the resource to get costs for (required).
+            bq_project_id (str): BigQuery project ID for cost data analysis (required).
+            bq_dataset (str): BigQuery dataset containing cost data (required).
+            bq_table (str): BigQuery table containing cost data (required).
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            granularity (str, optional): Data granularity. One of "DAILY", "MONTHLY", or "HOURLY". Defaults to "DAILY".
+
+        Returns:
+            Dict[str, Any]: Detailed resource cost analysis with insights and breakdowns.
+                {
+                    "resource_name": ...,
+                    "resource_type": ...,
+                    "period": {"start": ..., "end": ...},
+                    "granularity": ...,
+                    "total_cost": ...,
+                    "total_periods": ...,
+                    "active_periods": ...,
+                    "cost_periods": [...],
+                    "cost_breakdown": {...},
+                    "utilization_insights": [...],
+                    "cost_trends": [...],
+                    "recommendations": [...]
+                }
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_resource_costs(
+            ...     resource_name="instance-1",
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     granularity="DAILY"
+            ... )
+        """
         return self.cost_client.get_resource_costs(
             resource_name=resource_name,
             bq_project_id=bq_project_id,
@@ -671,9 +1695,60 @@ class GCPProvider(CloudProvider):
     
     # Advanced FinOps Features
     def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get comprehensive optimization recommendations for GCP.
+
+        This method provides optimization recommendations including machine type recommendations,
+        idle resource recommendations, and other cost optimization suggestions.
+
+        Args:
+            **kwargs: Additional parameters for specific optimization types.
+
+        Returns:
+            Dict[str, Any]: Optimization recommendations including:
+                - 'machine_type_recommendations': Machine type optimization recommendations
+                - 'idle_resource_recommendations': Idle resource recommendations
+                - 'cost_optimization_suggestions': General cost optimization suggestions
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_optimization_recommendations()
+        """
         return self.optimization_client.get_optimization_recommendations()
     
     def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get cost forecast for the specified period using GCP BigQuery ML.
+
+        This method provides cost forecasting capabilities using BigQuery ML with support for various
+        parameters and ensures required parameters are present with sensible defaults.
+
+        Args:
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            forecast_period (int, optional): Number of periods to forecast. Defaults to 12.
+            bq_project_id (str): BigQuery project ID for cost data analysis.
+            bq_dataset (str): BigQuery dataset containing cost data.
+            bq_table (str): BigQuery table containing cost data.
+
+        Returns:
+            Dict[str, Any]: Cost forecast data from GCP BigQuery ML including:
+                - Forecasted cost values
+                - Confidence intervals
+                - Forecast period details
+                - Model performance metrics
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_cost_forecast(
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     forecast_period=12,
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data"
+            ... )
+        """
         return self.analytics_client.get_cost_forecast_bqml(
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
@@ -684,6 +1759,38 @@ class GCPProvider(CloudProvider):
         )
     
     def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get cost anomalies using GCP BigQuery ML.
+
+        This method identifies cost anomalies using BigQuery ML with support for various parameters
+        and ensures required parameters are present with sensible defaults.
+
+        Args:
+            bq_project_id (str): BigQuery project ID for cost data analysis.
+            bq_dataset (str): BigQuery dataset containing cost data.
+            bq_table (str): BigQuery table containing cost data.
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to 30 days ago.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            anomaly_prob_threshold (float, optional): Probability threshold for anomaly detection. Defaults to 0.95.
+
+        Returns:
+            Dict[str, Any]: Cost anomalies data from GCP BigQuery ML including:
+                - Detected anomalies with timestamps
+                - Anomaly scores and probabilities
+                - Anomaly details and context
+                - Model performance metrics
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_cost_anomalies(
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     anomaly_prob_threshold=0.95
+            ... )
+        """
         return self.analytics_client.get_cost_anomalies(
             bq_project_id=kwargs.get('bq_project_id'),
             bq_dataset=kwargs.get('bq_dataset'),
@@ -694,6 +1801,39 @@ class GCPProvider(CloudProvider):
         )
     
     def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
+        """
+        Calculate cost efficiency metrics from GCP BigQuery.
+
+        This method calculates real cost efficiency metrics with support for various
+        parameters and ensures required parameters are present with sensible defaults.
+
+        Args:
+            bq_project_id (str): BigQuery project ID for cost data analysis.
+            bq_dataset (str): BigQuery dataset containing cost data.
+            bq_table (str): BigQuery table containing cost data.
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+            use_ml (bool, optional): Whether to use ML for enhanced metrics calculation. Defaults to False.
+
+        Returns:
+            Dict[str, Any]: Cost efficiency metrics including:
+                - 'total_cost': Total cost for the period
+                - 'cost_by_service': Cost breakdown by service
+                - 'waste_estimate': Estimated waste cost
+                - 'efficiency_score': Overall cost efficiency score
+                - 'optimization_opportunities': Identified optimization opportunities
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_cost_efficiency_metrics(
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31",
+            ...     use_ml=True
+            ... )
+        """
         return self.analytics_client.get_cost_efficiency_metrics(
             bq_project_id=kwargs.get('bq_project_id'),
             bq_dataset=kwargs.get('bq_dataset'),
@@ -701,9 +1841,44 @@ class GCPProvider(CloudProvider):
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
             use_ml=kwargs.get('use_ml')
-        ) 
+        )
     
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
+        """
+        Generate comprehensive cost report using GCP BigQuery.
+
+        This method generates comprehensive cost reports with support for various
+        parameters and ensures required parameters are present with sensible defaults.
+
+        Args:
+            bq_project_id (str): BigQuery project ID for cost data analysis.
+            bq_dataset (str): BigQuery dataset containing cost data.
+            bq_table (str): BigQuery table containing cost data.
+            report_type (str, optional): Type of report (monthly, quarterly, annual). Defaults to "monthly".
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
+
+        Returns:
+            Dict[str, Any]: Comprehensive cost report including:
+                - 'report_type': Type of report generated
+                - 'period': Time period covered
+                - 'total_cost': Total cost for the period
+                - 'cost_by_service': Cost breakdown by service
+                - 'cost_trends': Cost trends over time
+                - 'recommendations': Cost optimization recommendations
+                - 'generated_at': Timestamp of report generation
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.generate_cost_report(
+            ...     bq_project_id="your-project-id",
+            ...     bq_dataset="billing_data",
+            ...     bq_table="cost_data",
+            ...     report_type="monthly",
+            ...     start_date="2024-01-01",
+            ...     end_date="2024-01-31"
+            ... )
+        """
         return self.analytics_client.generate_cost_report(
             bq_project_id=kwargs.get('bq_project_id'),
             bq_dataset=kwargs.get('bq_dataset'),
@@ -714,14 +1889,54 @@ class GCPProvider(CloudProvider):
         )
     
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get governance policies and compliance status for GCP.
+
+        This method retrieves cost allocation labels, compliance status, and cost-related policies.
+
+        Args:
+            **kwargs: Additional parameters for governance policies.
+
+        Returns:
+            Dict[str, Any]: Governance policies and compliance information including:
+                - 'cost_policies': Cost-related governance policies
+                - 'compliance_status': Compliance status for cost policies
+                - 'cost_allocation_labels': Cost allocation labels (if available)
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_governance_policies()
+        """
         return {
-            # 'cost_allocation_labels': self.governance_client.get_cost_allocation_tags(**kwargs),
-            # 'policy_compliance': self.governance_client.get_policy_compliance(**kwargs),
+            'cost_allocation_labels': self.governance_client.get_cost_allocation_tags(**kwargs),
+            'policy_compliance': self.governance_client.get_policy_compliance(**kwargs),
             'cost_policies': self.governance_client.get_cost_policies(**kwargs)
         }
     
-    # GCP-specific additional methods
     def create_budget(self, **kwargs) -> Dict[str, Any]:
+        """
+        Create a new GCP budget.
+
+        This method creates a budget in GCP for the specified billing account, with support for
+        custom budget amounts and currency codes.
+
+        Args:
+            billing_account (str, optional): GCP billing account ID.
+            budget_name (str, optional): Name of the budget. Defaults to "pycloudmesh_budget".
+            amount (float, optional): Budget amount. Defaults to 1.
+            currency_code (str, optional): Currency code for the budget. Defaults to "USD".
+
+        Returns:
+            Dict[str, Any]: GCP response for budget creation. If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.create_budget(
+            ...     billing_account="012345-678901-ABCDEF",
+            ...     budget_name="monthly-budget",
+            ...     amount=1000.0,
+            ...     currency_code="USD"
+            ... )
+        """
         return self.budget_client.create_budget(
             billing_account=kwargs.get('billing_account'),
             budget_name=kwargs.get('budget_name', 'pycloudmesh_budget'),
@@ -730,15 +1945,57 @@ class GCPProvider(CloudProvider):
         )
     
     def get_budget_alerts(self, **kwargs) -> Dict[str, Any]:
+        """
+        Get alerts for a specific GCP budget.
+
+        This method retrieves all alerts configured for a specific budget.
+
+        Args:
+            billing_account (str, optional): GCP billing account ID.
+            budget_display_name (str, optional): Display name of the budget.
+
+        Returns:
+            Dict[str, Any]: Budget alerts from GCP. If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_budget_alerts(
+            ...     billing_account="012345-678901-ABCDEF",
+            ...     budget_display_name="monthly-budget"
+            ... )
+        """
         return self.budget_client.get_budget_alerts(
             billing_account=kwargs.get('billing_account'),
             budget_display_name=kwargs.get('budget_display_name')
         )
     
-    def get_machine_type_recommendations(self, **kwargs) -> Dict[str, Any]:
+    def get_machine_type_recommendations(self) -> Dict[str, Any]:
+        """
+        Get GCP machine type recommendations.
+
+        This method provides machine type optimization recommendations for Compute Engine instances.
+
+        Returns:
+            Dict[str, Any]: Machine type recommendations from GCP.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_machine_type_recommendations()
+        """
         return self.optimization_client.get_machine_type_recommendations()
     
-    def get_idle_resource_recommendations(self, **kwargs) -> Dict[str, Any]:
+    def get_idle_resource_recommendations(self) -> Dict[str, Any]:
+        """
+        Get GCP idle resource recommendations.
+
+        This method identifies idle or underutilized resources that could be stopped or downsized.
+
+        Returns:
+            Dict[str, Any]: Idle resource recommendations from GCP.
+            If the API call fails, returns a dictionary with an "error" key and message.
+
+        Example:
+            >>> gcp.get_idle_resource_recommendations()
+        """
         return self.optimization_client.get_idle_resource_recommendations()
 
 

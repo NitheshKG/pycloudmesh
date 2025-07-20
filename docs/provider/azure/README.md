@@ -470,119 +470,489 @@ optimizations = azure.get_optimization_recommendations(
 ## 4. Advanced Analytics
 
 ### get_cost_forecast
-Get cost forecast for the specified period.
+
+Fetches a cost forecast for the specified period and scope using Azure Cost Management API.
 
 **Signature:**
 ```python
 def get_cost_forecast(
     self,
-    start_date: str,
-    end_date: str,
-    forecast_period: int = 12
+    scope: str,
+    api_version: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    forecast_period: int = 12,
+    payload: Optional[dict] = None
 ) -> Dict[str, Any]:
 ```
 
-**Parameters:**
-- `start_date` (str): Start date for historical data.
-- `end_date` (str): End date for historical data.
-- `forecast_period` (int, optional): Number of months to forecast. Default: 12.
+---
 
-**Returns:**
-- Cost forecast data.
+#### Payload Structure
 
-**Example:**
+You can provide a custom `payload` dictionary to control the forecast query. If you do **not** provide a payload, a sensible default is used (see below).
+
+**Payload keys:**
+
+| Key                    | Type     | Description                                                                                  | Example/Options                |
+|------------------------|----------|----------------------------------------------------------------------------------------------|-------------------------------|
+| `type`                 | string   | Query type.                                                                                  | `"Usage"` (default)           |
+| `timeframe`            | string   | Time window for the query.                                                                   | `"Custom"`, `"MonthToDate"`, `"YearToDate"`, `"BillingMonthToDate"`, `"TheLastMonth"` |
+| `timePeriod`           | object   | Custom date range. Required if `timeframe` is `"Custom"`.                                   | `{ "from": ..., "to": ... }` |
+| `dataset`              | object   | Dataset options (see below).                                                                 | See below                     |
+| `includeActualCost`    | boolean  | Whether to include actual cost.                                                              | `False` (default)             |
+| `includeFreshPartialCost` | boolean | Whether to include fresh partial cost.                                                      | `False` (default)             |
+
+**Dataset keys:**
+
+| Key           | Type     | Description                                         | Example/Options                |
+|---------------|----------|-----------------------------------------------------|-------------------------------|
+| `granularity` | string   | Data granularity                                    | `"Daily"`                     |
+| `aggregation` | object   | Aggregation definition                              | See below                     |
+| `filter`      | object   | (Optional) OData filter for advanced filtering      | See Azure docs                |
+
+**Aggregation keys:**
+
+| Key         | Type     | Description                        | Example/Options                |
+|-------------|----------|------------------------------------|-------------------------------|
+| `name`      | string   | Metric to aggregate                | `"Cost"`, `"ActualCost"`, `"PreTaxCost"` |
+| `function`  | string   | Aggregation function               | `"Sum"`                       |
+
+---
+
+#### Example Payloads
+
+**Default payload (used if you do not provide one):**
+```python
+{
+    "type": "Usage",
+    "timeframe": "Custom",
+    "timePeriod": {
+        "from": "<start_date>",
+        "to": "<end_date>"
+    },
+    "dataset": {
+        "granularity": "Daily",
+        "aggregation": {
+            "totalCost": {
+                "name": "Cost",
+                "function": "Sum"
+            }
+        }
+    }
+}
+```
+- `<start_date>`: First day of the month, three months ago (UTC, ISO 8601)
+- `<end_date>`: Today at midnight UTC
+
+**Custom payload with filter and daily granularity:**
+```python
+payload = {
+    "type": "Usage",
+    "timeframe": "Custom",
+    "timePeriod": {
+        "from": "2024-01-01T00:00:00+00:00",
+        "to": "2024-03-31T00:00:00+00:00"
+    },
+    "dataset": {
+        "granularity": "Daily",
+        "aggregation": {
+            "totalCost": {
+                "name": "ActualCost",
+                "function": "Sum"
+            }
+        },
+        "filter": {
+            "dimensions": {
+                "name": "ResourceGroup",
+                "operator": "In",
+                "values": ["API", "WebApp"]
+            }
+        }
+    },
+    "includeActualCost": False,
+    "includeFreshPartialCost": False
+}
+```
+
+---
+
+#### Usage Examples
+
+**Using the default payload:**
 ```python
 forecast = azure.get_cost_forecast(
-    start_date="2024-01-01",
-    end_date="2024-06-30",
-    forecast_period=6
+    scope="/subscriptions/your-subscription-id",
+    api_version="2023-08-01"
+)
+```
+
+**Using a custom payload:**
+```python
+payload = {
+    "type": "Usage",
+    "timeframe": "Custom",
+    "timePeriod": {
+        "from": "2024-01-01T00:00:00+00:00",
+        "to": "2024-03-31T00:00:00+00:00"
+    },
+    "dataset": {
+        "granularity": "Daily",
+        "aggregation": {
+            "totalCost": {
+                "name": "ActualCost",
+                "function": "Sum"
+            }
+        }
+    }
+}
+forecast = azure.get_cost_forecast(
+    scope="/subscriptions/your-subscription-id",
+    api_version="2023-08-01",
+    payload=payload
 )
 ```
 
 ---
 
+#### Notes
+
+- If you do **not** provide a payload, the default is a daily forecast for the last three months, aggregating by `"Cost"` and `"Sum"`.
+- You can fully customize the payload to use any valid Azure Cost Management API options.
+- For advanced filtering, see [Azure Cost Management API documentation](https://learn.microsoft.com/en-us/rest/api/cost-management/forecast/usage?tabs=HTTP).
+- The `granularity` in the payload must be `"Daily"` for the forecast API.
+- The `timeframe` in the payload must be `"Custom"` or one of the predefined options (`"MonthToDate"`, `"YearToDate"`, `"BillingMonthToDate"`, `"TheLastMonth"`).
+- The `timePeriod` in the payload must be provided if `timeframe` is `"Custom"`.
+- The `dataset` in the payload must include `"granularity": "Daily"` and `"aggregation": { ... }`.
+- The `includeActualCost` and `includeFreshPartialCost` in the payload are boolean flags.
+- The `filter` in the payload is an optional OData filter for advanced filtering.
+- **Note:** The `granularity` in the payload must be `"Daily"` for the forecast API. If you need a monthly forecast, you must aggregate the daily results.
+
+---
+
 ### get_cost_anomalies
-Get cost anomalies (placeholder implementation).
+
+Get cost anomalies using Azure Cost Management query API.
 
 **Signature:**
 ```python
-def get_cost_anomalies(self) -> Dict[str, Any]:
+def get_cost_anomalies(
+    self,
+    scope: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    api_version: str = "2023-03-01",
+    payload: Optional[dict] = None
+) -> Dict[str, Any]:
 ```
 
+**Parameters:**
+- `scope` (str): Azure scope (subscription, resource group, billing account, etc.)
+- `start_date` (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to 30 days ago.
+- `end_date` (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
+- `api_version` (str, optional): API version for the Cost Management API.
+- `payload` (dict, optional): Custom payload for the query. If not provided, uses default payload.
+
 **Returns:**
-- Cost anomalies data.
+- Dictionary containing:
+  - `scope`: The Azure scope used for analysis
+  - `period`: Start and end dates of the analysis period
+  - `anomalies`: List of detected anomalies with details
+  - `total_records`: Number of anomalies found
+  - `cost_data`: Raw cost data from Azure API
+
+**Anomaly Detection Details:**
+- Uses statistical analysis (mean and standard deviation)
+- Identifies anomalies using 2-standard-deviation threshold
+- Categorizes anomalies as "spike" or "drop"
+- Assigns severity levels ("high" or "medium")
+- Each anomaly includes:
+  - Date of occurrence
+  - Actual cost vs expected cost
+  - Deviation amount and percentage
+  - Anomaly type and severity
+  - Statistical threshold used
 
 **Example:**
 ```python
-anomalies = azure.get_cost_anomalies()
+# Basic usage (last 30 days)
+anomalies = azure.get_cost_anomalies(
+    scope="/subscriptions/your-subscription-id"
+)
+
+# Custom date range
+anomalies = azure.get_cost_anomalies(
+    scope="/subscriptions/your-subscription-id",
+    start_date="2024-01-01",
+    end_date="2024-01-31"
+)
+
+# With custom payload
+custom_payload = {
+    "type": "Usage",
+    "timeframe": "Custom",
+    "timePeriod": {
+        "from": "2024-01-01",
+        "to": "2024-01-31"
+    },
+    "dataset": {
+        "granularity": "Daily",
+        "aggregation": {
+            "totalCost": {
+                "name": "Cost",
+                "function": "Sum"
+            }
+        },
+        "filter": {
+            "dimensions": {
+                "name": "ResourceGroup",
+                "operator": "In",
+                "values": ["Production", "Development"]
+            }
+        }
+    }
+}
+
+anomalies = azure.get_cost_anomalies(
+    scope="/subscriptions/your-subscription-id",
+    payload=custom_payload
+)
+```
+
+**Sample Response:**
+```json
+{
+  "scope": "/subscriptions/your-subscription-id",
+  "period": {"start": "2024-01-01", "end": "2024-01-31"},
+  "anomalies": [
+    {
+      "date": "2024-01-15",
+      "cost": 150.25,
+      "expected_cost": 75.50,
+      "deviation": 74.75,
+      "deviation_percentage": 99.0,
+      "type": "spike",
+      "severity": "high",
+      "threshold": 25.30
+    }
+  ],
+  "total_records": 1,
+  "cost_data": { ... }
+}
 ```
 
 ---
 
 ### get_cost_efficiency_metrics
-Get cost efficiency metrics (cost per user, per transaction, etc.).
+Calculate real cost efficiency metrics from Azure Cost Management API.
 
 **Signature:**
 ```python
-def get_cost_efficiency_metrics(self) -> Dict[str, Any]:
+def get_cost_efficiency_metrics(
+    self,
+    scope: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    user_count: Optional[int] = None,
+    transaction_count: Optional[int] = None,
+    api_version: str = "2023-03-01"
+) -> Dict[str, Any]:
 ```
 
+**Parameters:**
+- `scope` (str): Azure scope (subscription, resource group, billing account, etc.)
+- `start_date` (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to first day of current month.
+- `end_date` (str, optional): End date for analysis (YYYY-MM-DD). Defaults to today.
+- `user_count` (int, optional): Number of users for cost per user calculation
+- `transaction_count` (int, optional): Number of transactions for cost per transaction calculation
+- `api_version` (str, optional): API version for the Cost Management API
+
 **Returns:**
-- Cost efficiency metrics.
+- Dictionary containing comprehensive efficiency metrics:
+  - `total_cost`: Total cost for the period
+  - `cost_by_service`: Cost breakdown by Azure service
+  - `period`: Analysis period (start and end dates)
+  - `total_days_analyzed`: Number of days analyzed
+  - `cost_per_user`: Cost per user (if user_count provided)
+  - `cost_per_transaction`: Cost per transaction (if transaction_count provided)
+  - `avg_daily_cost`: Average daily cost
+  - `cost_stddev`: Standard deviation of daily costs
+  - `cost_variance_ratio`: Variance ratio for efficiency scoring
+  - `cost_efficiency_score`: Overall efficiency score (0-1)
+  - `waste_days`: Number of days with high cost variance
+  - `waste_percentage`: Percentage of days with waste
 
 **Example:**
 ```python
-efficiency = azure.get_cost_efficiency_metrics()
+# Basic usage
+efficiency = azure.get_cost_efficiency_metrics(
+    scope="/subscriptions/your-subscription-id"
+)
+
+# With custom parameters
+efficiency = azure.get_cost_efficiency_metrics(
+    scope="/subscriptions/your-subscription-id",
+    start_date="2024-01-01",
+    end_date="2024-01-31",
+    user_count=100,
+    transaction_count=10000
+)
+```
+
+**Sample Response:**
+```json
+{
+  "efficiency_metrics": {
+    "total_cost": 1250.75,
+    "cost_by_service": {
+      "Virtual Machines": 450.25,
+      "Storage": 300.50,
+      "Network": 200.00,
+      "Other": 300.00
+    },
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "total_days_analyzed": 31,
+    "cost_per_user": 12.51,
+    "cost_per_transaction": 0.125,
+    "avg_daily_cost": 40.35,
+    "cost_stddev": 8.25,
+    "cost_variance_ratio": 0.204,
+    "cost_efficiency_score": 0.898,
+    "waste_days": 3,
+    "waste_percentage": 9.7
+  }
+}
 ```
 
 ---
 
 ### generate_cost_report
-Generate a comprehensive cost report.
+Generate a comprehensive cost report for a given Azure scope, with flexible options for metrics, grouping, and filtering.
 
 **Signature:**
 ```python
 def generate_cost_report(
     self,
+    scope: str,
     report_type: str = "monthly",
     start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    end_date: Optional[str] = None,
+    metrics: Optional[list] = None,
+    group_by: Optional[list] = None,
+    filter_: Optional[dict] = None
 ) -> Dict[str, Any]:
 ```
 
 **Parameters:**
-- `report_type` (str, optional): Type of report (monthly, quarterly, annual). Default: "monthly".
-- `start_date` (str, optional): Start date for report. Defaults to first day of current month.
-- `end_date` (str, optional): End date for report. Defaults to today.
+- `scope` (str, required): Azure scope. Examples:
+    - Subscription: `/subscriptions/{subscription-id}/`
+    - Resource Group: `/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/`
+    - Billing Account: `/providers/Microsoft.Billing/billingAccounts/{billing-account-id}`
+- `report_type` (str, optional): Type of report (`"monthly"`, `"quarterly"`, `"annual"`). Controls default date range and summary aggregation. Defaults to `"monthly"`.
+- `start_date` (str, optional): Start date for report (YYYY-MM-DD). If not provided, defaults based on `report_type`.
+- `end_date` (str, optional): End date for report (YYYY-MM-DD). If not provided, defaults based on `report_type`.
+- `metrics` (list, optional): List of cost metrics to aggregate (e.g., `["Cost"]`).
+- `group_by` (list, optional): List of dimensions to group by (e.g., `["ServiceName"]`).
+- `filter_` (dict, optional): Additional filter criteria for the query.
 
 **Returns:**
-- Cost report data.
+- `Dict[str, Any]`: Cost report, including summary for quarterly/annual types and raw cost data as returned by Azure Cost Management API.
+    - `report_type`: The type of report generated
+    - `period`: Start and end dates
+    - `cost_data`: Raw cost data from Azure API
+    - `summary`: (For quarterly/annual) Aggregated totals by quarter or year
+    - `generated_at`: Timestamp
 
-**Example:**
+**Behavior:**
+- If `report_type` is `"monthly"`, defaults to current month.
+- If `"quarterly"`, defaults to last 3 months and includes a summary by quarter.
+- If `"annual"`, defaults to last 12 months and includes a summary by year.
+- If `start_date`/`end_date` are provided, they override the default date range.
+- You can use `metrics`, `group_by`, and `filter_` for advanced customization.
+
+**Examples:**
 ```python
+# Basic monthly report for a subscription
 report = azure.generate_cost_report(
-    report_type="quarterly",
-    start_date="2024-01-01",
-    end_date="2024-03-31"
+    scope="/subscriptions/your-subscription-id/"
 )
+
+# Quarterly report with summary
+report = azure.generate_cost_report(
+    scope="/subscriptions/your-subscription-id/",
+    report_type="quarterly"
+)
+
+# Annual report, grouped by service
+report = azure.generate_cost_report(
+    scope="/subscriptions/your-subscription-id/",
+    report_type="annual",
+    group_by=["ServiceName"]
+)
+
+# Custom date range, custom metrics, and filter
+report = azure.generate_cost_report(
+    scope="/subscriptions/your-subscription-id/",
+    start_date="2024-01-01",
+    end_date="2024-03-31",
+    metrics=["Cost"],
+    group_by=["ResourceGroupName"],
+    filter_={
+        "dimensions": {
+            "name": "ResourceGroupName",
+            "operator": "In",
+            "values": ["API", "WebApp"]
+        }
+    }
+)
+
+# Accessing the summary for a quarterly report
+summary = report.get("summary", {})
+for quarter, total in summary.items():
+    print(f"{quarter}: {total}")
 ```
+
+**Notes:**
+- For quarterly and annual reports, the `summary` field provides a dictionary of totals by quarter or year.
+- The `cost_data` field contains the raw Azure API response, which can be further analyzed if needed.
+- See the [get_cost_data](#get_cost_data) section for valid metrics and group_by options for your scope.
 
 ## 5. Governance & Compliance
 
 ### get_governance_policies
-Get Azure cost management policies.
+Get Azure governance policies and compliance status for cost management.
 
 **Signature:**
 ```python
-def get_cost_policies(self) -> Dict[str, Any]:
+def get_governance_policies(self, scope: str, tag_names: Optional[List[str]] = None) -> Dict[str, Any]:
 ```
 
+**Parameters:**
+- `scope` (str): Azure scope (subscription, resource group, etc.).
+    - Example: "/subscriptions/{subscription-id}/"
+- `tag_names` (List[str], optional): List of tag names to use for cost allocation analysis. If not provided, all available tags will be used.
+
 **Returns:**
-- Dictionary with a list of cost management policies.
+- `Dict[str, Any]`: Dictionary with keys:
+    - `'cost_allocation_by_tags'`: Cost allocation analysis grouped by tags/dimensions
+    - `'policy_compliance'`: Compliance status for cost-related policies
+    - `'cost_policies'`: List of cost-related governance policies
 
 **Example:**
 ```python
-policies = azure.get_cost_policies()
+policies = azure.get_governance_policies(
+    scope="/subscriptions/your-subscription-id/",
+    tag_names=["Environment", "Project"]
+)
+
+# Access cost allocation by tags
+cost_allocation = policies['cost_allocation_by_tags']
+
+# Access policy compliance
+compliance = policies['policy_compliance']
+
+# Access cost-related policies
+cost_policies = policies['cost_policies']
 ```
 
 ---
@@ -606,19 +976,40 @@ tags = azure.get_cost_allocation_tags()
 ---
 
 ### get_policy_compliance
-Get policy compliance status for Azure resources.
+Get policy compliance status with focus on cost-related policies for FinOps governance.
 
 **Signature:**
 ```python
-def get_policy_compliance(self) -> Dict[str, Any]:
+def get_policy_compliance(self, scope: Optional[str] = None) -> Dict[str, Any]:
 ```
 
+**Parameters:**
+- `scope` (Optional[str]): Azure scope to check compliance for. If not provided, checks at subscription level.
+
 **Returns:**
-- Policy compliance status.
+- Dictionary containing:
+  - `scope`: The scope being checked
+  - `total_policies`: Number of cost-related policies found
+  - `compliant_resources`: Number of compliant resources
+  - `non_compliant_resources`: Number of non-compliant resources
+  - `cost_related_policies`: List of cost-related policies with compliance status
+  - `compliance_score`: Overall compliance percentage
+  - `cost_governance_insights`: Insights about cost governance effectiveness
 
 **Example:**
 ```python
+# Check compliance at subscription level
 compliance = azure.get_policy_compliance()
+
+# Check compliance at resource group level
+compliance = azure.get_policy_compliance(
+    scope="/subscriptions/your-subscription-id/resourceGroups/your-rg/"
+)
+
+# Access compliance insights
+print(f"Compliance Score: {compliance['compliance_score']:.1f}%")
+for insight in compliance['cost_governance_insights']:
+    print(f"Insight: {insight}")
 ```
 
 ## 6. Reservation Management
@@ -630,12 +1021,15 @@ Get Azure reservation utilization and cost data.
 ```python
 def get_reservation_cost(
     self,
-    start_date: str = None,
-    end_date: str = None
+    scope: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ) -> Dict[str, Any]:
 ```
 
 **Parameters:**
+- `scope` (str): Azure scope (subscription, resource group, etc.).
+    - Example: "/subscriptions/{subscription-id}/"
 - `start_date` (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
 - `end_date` (str, optional): End date in YYYY-MM-DD format. Defaults to last day of current month.
 
@@ -644,9 +1038,21 @@ def get_reservation_cost(
 
 **Example:**
 ```python
+# Get reservation costs for a subscription with default date range
 reservation_costs = azure.get_reservation_cost(
+    scope="/subscriptions/your-subscription-id/"
+)
+
+# Get reservation costs for a specific date range
+reservation_costs = azure.get_reservation_cost(
+    scope="/subscriptions/your-subscription-id/",
     start_date="2024-06-01",
     end_date="2024-06-30"
+)
+
+# Get reservation costs for a resource group
+reservation_costs = azure.get_reservation_cost(
+    scope="/subscriptions/your-subscription-id/resourceGroups/your-rg/"
 )
 ```
 
@@ -655,23 +1061,69 @@ reservation_costs = azure.get_reservation_cost(
 ### get_reservation_recommendation
 Get Azure reservation recommendations for various services.
 
+This method retrieves reservation purchase recommendations based on your usage patterns.
+You can filter recommendations by various criteria using OData filter syntax.
+
 **Signature:**
 ```python
 def get_reservation_recommendation(
     self,
-    subscription_id: str
+    scope: str,
+    filter: Optional[str] = None,
+    api_version: str = "2024-08-01"
 ) -> List[Dict[str, Any]]:
 ```
 
 **Parameters:**
-- `subscription_id` (str): Azure subscription ID.
+- `scope` (str): Azure scope (subscription, resource group, etc.).
+    - Example: "/subscriptions/{subscription-id}/"
+- `filter` (str, optional): OData filter string for server-side filtering.
+    - Common filter examples:
+        - `"ResourceGroup eq 'MyResourceGroup'"` - Filter by resource group
+        - `"Location eq 'eastus'"` - Filter by Azure region
+        - `"Sku eq 'Standard_D2s_v3'"` - Filter by VM SKU
+        - `"Term eq 'P1Y'"` - Filter by 1-year term
+        - `"Term eq 'P3Y'"` - Filter by 3-year term
+        - `"Location eq 'eastus' and Term eq 'P1Y'"` - Combine filters
+- `api_version` (str, optional): API version for the Consumption API. Defaults to "2024-08-01".
 
 **Returns:**
-- List of reservation recommendations.
+- `List[Dict[str, Any]]`: List of reservation recommendations with details including:
+    - Resource group, location, SKU information
+    - Recommended quantity and term
+    - Potential savings
+    - Usage data used for recommendations
 
 **Example:**
 ```python
-recommendations = azure.get_reservation_recommendation(subscription_id="your-subscription-id")
+# Get all recommendations for a subscription
+recommendations = azure.get_reservation_recommendation(
+    scope="/subscriptions/your-subscription-id/"
+)
+
+# Filter by resource group
+recommendations = azure.get_reservation_recommendation(
+    scope="/subscriptions/your-subscription-id/",
+    filter="ResourceGroup eq 'Production'"
+)
+
+# Filter by location and term
+recommendations = azure.get_reservation_recommendation(
+    scope="/subscriptions/your-subscription-id/",
+    filter="Location eq 'eastus' and Term eq 'P1Y'"
+)
+
+# Filter by specific VM SKU
+recommendations = azure.get_reservation_recommendation(
+    scope="/subscriptions/your-subscription-id/",
+    filter="Sku eq 'Standard_D2s_v3'"
+)
+
+# Complex filter with multiple conditions
+recommendations = azure.get_reservation_recommendation(
+    scope="/subscriptions/your-subscription-id/",
+    filter="ResourceGroup eq 'Production' and Location eq 'eastus' and Term eq 'P3Y'"
+)
 ```
 
 ---
@@ -681,15 +1133,22 @@ Get Azure reservation order details.
 
 **Signature:**
 ```python
-def get_azure_reservation_order_details(self) -> Dict[str, Any]:
+def get_reservation_order_details(self, **kwargs) -> Dict[str, Any]:
 ```
 
+**Parameters:**
+- `api_version` (str, optional): API version for the Azure Reservation API. Defaults to "2022-11-01".
+
 **Returns:**
-- Reservation order details.
+- Reservation order details as returned by the Azure API. If the API call fails, returns a dictionary with an "error" key and message.
 
 **Example:**
 ```python
-order_details = azure.get_azure_reservation_order_details()
+# Get reservation order details with default API version
+order_details = azure.get_reservation_order_details()
+
+# Get reservation order details with specific API version
+order_details = azure.get_reservation_order_details(api_version="2022-11-01")
 ```
 
 ## 📋 Azure Budget Management Examples
