@@ -11,7 +11,7 @@ setup(
     description="A package that exposes the cost API data for AWS, Azure, and GCP",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/NitheshKG/cloudmesh",
+    url="https://github.com/NitheshKG/pycloudmesh",
     packages=find_packages(),
     install_requires=requirements,
     classifiers=[

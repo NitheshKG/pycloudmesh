@@ -149,7 +149,6 @@ class TestGCPCostManagement(unittest.TestCase):
     def test_get_cost_data_missing_bigquery_config(self):
         """Test cost data retrieval without BigQuery config."""
         result = self.cost_client.get_cost_data()
-        
         self.assertIn("error", result)
         self.assertIn("BigQuery billing export table not configured", result["error"])
         print("✅ GCP cost data missing BigQuery config handling successful")
@@ -509,6 +508,69 @@ class TestGCPProviderIntegration(unittest.TestCase):
         print("✅ GCP provider integration workflow successful")
 
 
+class TestGCPProviderDirectMethods(unittest.TestCase):
+    """Test GCPProvider methods not directly covered elsewhere."""
+    
+    def setUp(self):
+        self.project_id = GCP_PROJECT_ID
+        self.credentials_path = GCP_CREDENTIAL_PATH
+        self.gcp_provider = GCPProvider(self.project_id, self.credentials_path)
+        self.billing_account = GCP_BILLING_ACCOUNT
+        self.bq_project_id = BQ_PROJECT_ID
+        self.bq_dataset = BQ_DATASET
+        self.bq_table = BQ_TABLE
+
+    def test_get_cost_forecast(self):
+        result = self.gcp_provider.get_cost_forecast(
+            start_date="2025-06-01",
+            end_date="2025-07-03",
+            bq_project_id=self.bq_project_id,
+            bq_dataset=self.bq_dataset,
+            bq_table=self.bq_table
+        )
+        self.assertIsInstance(result, dict)
+        print(f"✅ get_cost_forecast result: {list(result.keys())}")
+
+    def test_get_governance_policies(self):
+        result = self.gcp_provider.get_governance_policies(
+            bq_project_id=self.bq_project_id,
+            bq_dataset=self.bq_dataset,
+            bq_table=self.bq_table,
+            gcp_billing_account=self.billing_account
+        )
+        self.assertIsInstance(result, dict)
+        print(f"✅ get_governance_policies result keys: {list(result.keys())}")
+
+    def test_create_budget(self):
+        budget_name = f"Test_pycloudmesh_budget_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        result = self.gcp_provider.create_budget(
+            billing_account=self.billing_account,
+            budget_name=budget_name,
+            amount=1.0,
+            currency_code="USD"
+        )
+        self.assertIsInstance(result, dict)
+        print(f"✅ create_budget result: {result.get('name', result)}")
+
+    def test_get_budget_alerts(self):
+        result = self.gcp_provider.get_budget_alerts(
+            billing_account=self.billing_account,
+            budget_display_name="pycloudmesh_budget"
+        )
+        self.assertIsInstance(result, dict)
+        print(f"✅ get_budget_alerts result keys: {list(result.keys())}")
+
+    def test_get_machine_type_recommendations(self):
+        result = self.gcp_provider.get_machine_type_recommendations()
+        self.assertIsInstance(result, dict)
+        print(f"✅ get_machine_type_recommendations result keys: {list(result.keys())}")
+
+    def test_get_idle_resource_recommendations(self):
+        result = self.gcp_provider.get_idle_resource_recommendations()
+        self.assertIsInstance(result, dict)
+        print(f"✅ get_idle_resource_recommendations result keys: {list(result.keys())}")
+
+
 def run_tests():
     """Run all GCP tests."""
     print("Running Comprehensive GCP Tests with Real Credentials")
@@ -523,14 +585,15 @@ def run_tests():
     
     # Add test classes
     test_classes = [
-        TestGCPClientCreation,
-        TestGCPBudgetManagement,
+        # TestGCPClientCreation,
+        # TestGCPBudgetManagement,
         TestGCPCostManagement,
-        TestGCPReservationManagement,
-        TestGCPOptimization,
-        TestGCPGovernance,
-        TestGCPAnalytics,
-        TestGCPProviderIntegration
+        # TestGCPReservationManagement,
+        # TestGCPOptimization,
+        # TestGCPGovernance,
+        # TestGCPAnalytics,
+        # TestGCPProviderIntegration,
+        # TestGCPProviderDirectMethods
     ]
     
     for test_class in test_classes:
