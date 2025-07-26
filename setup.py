@@ -14,6 +14,7 @@ setup(
     url="https://github.com/NitheshKG/pycloudmesh",
     packages=find_packages(),
     install_requires=requirements,
+    include_package_data=True,  # This ensures MANIFEST.in is used
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

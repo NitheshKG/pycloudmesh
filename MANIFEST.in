@@ -1,0 +1,36 @@
+include README.md
+include LICENSE
+include requirements.txt
+include pyproject.toml
+include setup.py
+
+# Include all Python packages
+recursive-include pycloudmesh *.py
+
+# Include documentation
+recursive-include docs *.md
+
+# Include examples
+recursive-include examples *.py
+
+# Exclude tests (not needed in PyPI package)
+exclude tests/
+exclude tests/*
+
+# Exclude assets directory (images, gifs, etc.)
+exclude assets/
+exclude assets/*
+
+# Exclude common files that shouldn't be in the package
+exclude .gitignore
+exclude .DS_Store
+exclude *.pyc
+exclude __pycache__
+exclude .pytest_cache
+exclude .coverage
+exclude *.egg-info
+exclude build/
+exclude dist/
+exclude .venv/
+exclude venv/
+exclude env/ 

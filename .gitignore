@@ -294,3 +294,7 @@ settings.local.*
 
 # Test files
 test_individual.py
+
+# Test reports
+tests/test_reports/
+*.test.json

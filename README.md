@@ -22,6 +22,8 @@ pip install pycloudmesh
 
 ### Basic Usage
 
+![PyCloudMesh](assets/pycloudmesh.gif)
+
 ```python
 from pycloudmesh import aws_client, azure_client, gcp_client
 

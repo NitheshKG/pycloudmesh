@@ -1,7 +1,13 @@
 LICENSE
+MANIFEST.in
 README.md
 pyproject.toml
+requirements.txt
 setup.py
+docs/provider/aws/README.md
+docs/provider/azure/README.md
+docs/provider/gcp/README.md
+examples/comprehensive_finops_example.py
 pycloudmesh/__init__.py
 pycloudmesh/definitions.py
 pycloudmesh/pycloudmesh.py
