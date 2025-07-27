@@ -45,8 +45,6 @@ Dynamic: summary
 
 # PyCloudMesh - Comprehensive FinOps Management
 
-![PyCloudMesh](assets/pycloudmesh.gif)
-
 PyCloudMesh is a unified Python library for comprehensive Financial Operations (FinOps) management across AWS, Azure, and GCP. It provides a consistent interface for cost optimization, governance, analytics, and resource management across all major cloud providers.
 
 ## 🌟 Features
@@ -68,6 +66,8 @@ pip install pycloudmesh
 ```
 
 ### Basic Usage
+
+![PyCloudMesh](assets/pycloudmesh.gif)
 
 ```python
 from pycloudmesh import aws_client, azure_client, gcp_client

@@ -453,9 +453,9 @@ class GCPBudgetManagement:
         except Exception as e:
             return {"error": f"Failed to create budget: {str(e)}"}
 
-    def get_budget_alerts(self, billing_account: str, budget_display_name: str) -> Dict[str, Any]:
+    def get_budget_notifications(self, billing_account: str, budget_display_name: str) -> Dict[str, Any]:
         """
-        Get threshold rules and alert info for a specific budget.
+        Get notifications for a specific budget.
         Args:
             billing_account (str): GCP billing account ID
             budget_display_name (str): Display name of the budget
@@ -597,7 +597,7 @@ class GCPCostManagement:
         end_date: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
-        Get detailed cost analysis with dimensions.
+        Get detailed cost analysis with dimensions, insights, and breakdowns.
 
         Args:
             bq_project_id (str): BigQuery project ID for billing export (required).
@@ -607,18 +607,145 @@ class GCPCostManagement:
             end_date (Optional[str]): End date for analysis
 
         Returns:
-            Dict[str, Any]: Cost analysis data
+            Dict[str, Any]: Cost analysis with breakdowns, insights, and trends
         """
-        dimensions = ["service", "location", "project"]
+        from google.cloud import bigquery
+        from datetime import datetime, timedelta
 
-        return self.get_cost_data(
-            start_date=start_date,
-            end_date=end_date,
-            group_by=dimensions,
-            bq_project_id=bq_project_id,
-            bq_dataset=bq_dataset,
-            bq_table=bq_table
-        )
+        # Set default dates if not provided
+        if not start_date or not end_date:
+            today = datetime.today()
+            start_date = today.replace(day=1).strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+
+        try:
+            client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
+            
+            # Query for cost analysis with service and location breakdown
+            query = f"""
+                SELECT
+                    service.description as service_name,
+                    COALESCE(CAST(location.location AS STRING), 'UNKNOWN') as location,
+                    project.id as project_id,
+                    SUM(cost) as total_cost
+                FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
+                WHERE 
+                    usage_start_time >= '{start_date}'
+                    AND usage_end_time <= '{end_date}'
+                GROUP BY service_name, location, project_id
+                ORDER BY total_cost DESC
+            """
+            
+            query_job = client.query(query)
+            results = list(query_job)
+            
+            # Prepare analysis structure
+            analysis = {
+                "period": {"start": start_date, "end": end_date},
+                "dimensions": ["service", "location", "project"],
+                "total_cost": 0.0,
+                "cost_breakdown": {},
+                "top_services": [],
+                "cost_trends": [],
+                "insights": []
+            }
+            
+            # Process results
+            service_costs = {}
+            location_costs = {}
+            project_costs = {}
+            
+            for row in results:
+                service_name = row["service_name"] if row["service_name"] else "Unknown Service"
+                location = row["location"] if row["location"] else "Unknown Location"
+                project_id = row["project_id"] if row["project_id"] else "Unknown Project"
+                cost = float(row["total_cost"]) if row["total_cost"] is not None else 0.0
+                
+                # Aggregate by service
+                if service_name not in service_costs:
+                    service_costs[service_name] = 0.0
+                service_costs[service_name] += cost
+                
+                # Aggregate by location
+                if location not in location_costs:
+                    location_costs[location] = 0.0
+                location_costs[location] += cost
+                
+                # Aggregate by project
+                if project_id not in project_costs:
+                    project_costs[project_id] = 0.0
+                project_costs[project_id] += cost
+                
+                analysis["total_cost"] += cost
+                
+                # Add to cost trends
+                analysis["cost_trends"].append({
+                    "service": service_name,
+                    "location": location,
+                    "project": project_id,
+                    "cost": cost
+                })
+            
+            # Build cost breakdown
+            analysis["cost_breakdown"] = {
+                "by_service": service_costs,
+                "by_location": location_costs,
+                "by_project": project_costs
+            }
+            
+            # Generate top services
+            sorted_services = sorted(service_costs.items(), key=lambda x: x[1], reverse=True)
+            analysis["top_services"] = [
+                {"service": service, "cost": cost} 
+                for service, cost in sorted_services[:5]
+            ]
+            
+            # Generate insights
+            if analysis["total_cost"] > 0:
+                # Top service insight
+                if sorted_services:
+                    top_service = sorted_services[0]
+                    top_percentage = (top_service[1] / analysis["total_cost"]) * 100
+                    analysis["insights"].append(
+                        f"Top service '{top_service[0]}' accounts for {top_percentage:.1f}% of total costs"
+                    )
+                    
+                    # Top 3 services insight
+                    if len(sorted_services) >= 3:
+                        top3_total = sum(cost for _, cost in sorted_services[:3])
+                        top3_percentage = (top3_total / analysis["total_cost"]) * 100
+                        analysis["insights"].append(
+                            f"Top 3 services account for {top3_percentage:.1f}% of total costs"
+                        )
+                
+                # Location insight
+                if location_costs:
+                    top_location = max(location_costs.items(), key=lambda x: x[1])
+                    location_percentage = (top_location[1] / analysis["total_cost"]) * 100
+                    analysis["insights"].append(
+                        f"Top location '{top_location[0]}' accounts for {location_percentage:.1f}% of total costs"
+                    )
+                
+                # Project insight
+                if project_costs:
+                    top_project = max(project_costs.items(), key=lambda x: x[1])
+                    project_percentage = (top_project[1] / analysis["total_cost"]) * 100
+                    analysis["insights"].append(
+                        f"Top project '{top_project[0]}' accounts for {project_percentage:.1f}% of total costs"
+                    )
+                
+                # Cost distribution insight
+                if len(sorted_services) > 1:
+                    cost_variance = max(service_costs.values()) - min(service_costs.values())
+                    if cost_variance > analysis["total_cost"] * 0.5:
+                        analysis["insights"].append("High cost concentration in top services")
+                    else:
+                        analysis["insights"].append("Relatively even cost distribution across services")
+            
+            return analysis
+            
+        except Exception as e:
+            return {"error": f"Failed to perform cost analysis: {str(e)}"}
 
     def get_cost_trends(
         self,
@@ -628,7 +755,7 @@ class GCPCostManagement:
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Get cost trends over time.
+        Get detailed cost trends analysis with insights and patterns.
 
         Args:
             bq_project_id (str): BigQuery project ID for billing export (required).
@@ -638,16 +765,144 @@ class GCPCostManagement:
             end_date (str, optional): End date for trend analysis (in kwargs).
 
         Returns:
-            Dict[str, Any]: Cost trends data
+            Dict[str, Any]: Cost trends data with daily breakdown and analysis
         """
-        return self.get_cost_data(
-            granularity=kwargs.get('granularity', 'Daily'),
-            bq_project_id=bq_project_id,
-            bq_dataset=bq_dataset,
-            bq_table=bq_table,
-            start_date=kwargs.get('start_date', ''),
-            end_date=kwargs.get('end_date', '')
-        )
+        from google.cloud import bigquery
+        from datetime import datetime, timedelta
+
+        # Set default dates if not provided
+        start_date = kwargs.get('start_date')
+        end_date = kwargs.get('end_date')
+        
+        if not start_date or not end_date:
+            today = datetime.today()
+            start_date = today.replace(day=1).strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+
+        try:
+            client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
+            
+            # Query for daily cost trends
+            query = f"""
+                SELECT
+                    DATE(usage_start_time) as date,
+                    SUM(cost) as daily_cost
+                FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
+                WHERE 
+                    usage_start_time >= '{start_date}'
+                    AND usage_end_time <= '{end_date}'
+                GROUP BY date
+                ORDER BY date
+            """
+            
+            query_job = client.query(query)
+            results = list(query_job)
+            
+            # Prepare trends analysis structure
+            trends_analysis = {
+                "period": {"start": start_date, "end": end_date},
+                "granularity": "Daily",
+                "total_periods": 0,
+                "total_cost": 0.0,
+                "average_daily_cost": 0.0,
+                "cost_periods": [],
+                "trend_direction": "stable",
+                "growth_rate": 0.0,
+                "peak_periods": [],
+                "low_periods": [],
+                "patterns": [],
+                "insights": []
+            }
+            
+            # Process results
+            costs = []
+            for row in results:
+                date = row["date"].strftime("%Y-%m-%d") if row["date"] else "unknown"
+                cost = float(row["daily_cost"]) if row["daily_cost"] is not None else 0.0
+                
+                trends_analysis["total_cost"] += cost
+                trends_analysis["total_periods"] += 1
+                trends_analysis["cost_periods"].append({
+                    "date": date,
+                    "cost": cost
+                })
+                costs.append(cost)
+            
+            # Calculate average daily cost
+            if trends_analysis["total_periods"] > 0:
+                trends_analysis["average_daily_cost"] = trends_analysis["total_cost"] / trends_analysis["total_periods"]
+            
+            # Find peak and low periods
+            if costs:
+                max_cost = max(costs)
+                min_cost = min(costs)
+                
+                for period in trends_analysis["cost_periods"]:
+                    if period["cost"] == max_cost and max_cost > 0:
+                        trends_analysis["peak_periods"].append(period)
+                    if period["cost"] == min_cost:
+                        trends_analysis["low_periods"].append(period)
+            
+            # Calculate trend direction and growth rate
+            if len(costs) >= 2:
+                first_half = costs[:len(costs)//2]
+                second_half = costs[len(costs)//2:]
+                
+                if first_half and second_half:
+                    first_avg = sum(first_half) / len(first_half)
+                    second_avg = sum(second_half) / len(second_half)
+                    
+                    if first_avg > 0:
+                        growth_rate = ((second_avg - first_avg) / first_avg) * 100
+                        trends_analysis["growth_rate"] = growth_rate
+                        
+                        if growth_rate > 10:
+                            trends_analysis["trend_direction"] = "increasing"
+                        elif growth_rate < -10:
+                            trends_analysis["trend_direction"] = "decreasing"
+                        else:
+                            trends_analysis["trend_direction"] = "stable"
+            
+            # Generate patterns and insights
+            if costs:
+                # Pattern: Check for consistent vs variable costs
+                non_zero_costs = [c for c in costs if c > 0]
+                if non_zero_costs:
+                    cost_variance = max(non_zero_costs) - min(non_zero_costs)
+                    if cost_variance > trends_analysis["average_daily_cost"]:
+                        trends_analysis["patterns"].append("High cost variability")
+                    else:
+                        trends_analysis["patterns"].append("Consistent cost pattern")
+                
+                # Pattern: Check for zero-cost periods
+                zero_cost_periods = len([c for c in costs if c == 0])
+                if zero_cost_periods > len(costs) * 0.5:
+                    trends_analysis["patterns"].append("Many zero-cost periods")
+                
+                # Insights
+                if trends_analysis["total_cost"] > 0:
+                    trends_analysis["insights"].append(
+                        f"Total cost over {trends_analysis['total_periods']} periods: ${trends_analysis['total_cost']:.2f}"
+                    )
+                    trends_analysis["insights"].append(
+                        f"Average cost per period: ${trends_analysis['average_daily_cost']:.4f}"
+                    )
+                    
+                    if trends_analysis["trend_direction"] != "stable":
+                        trends_analysis["insights"].append(
+                            f"Cost trend is {trends_analysis['trend_direction']} ({trends_analysis['growth_rate']:.1f}% change)"
+                        )
+                    
+                    if trends_analysis["peak_periods"]:
+                        peak_period = trends_analysis["peak_periods"][0]
+                        trends_analysis["insights"].append(
+                            f"Peak cost period: {peak_period['date']} (${peak_period['cost']:.4f})"
+                        )
+            
+            return trends_analysis
+            
+        except Exception as e:
+            return {"error": f"Failed to fetch cost trends: {str(e)}"}
 
     def get_resource_costs(
         self,
@@ -658,7 +913,7 @@ class GCPCostManagement:
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Get costs for a specific resource.
+        Get detailed cost analysis for a specific resource.
 
         Args:
             resource_name (str): Name/ID of the resource to get costs for.
@@ -669,16 +924,175 @@ class GCPCostManagement:
             end_date (str, optional): End date for cost data (in kwargs).
 
         Returns:
-            Dict[str, Any]: Resource cost data
+            Dict[str, Any]: Detailed resource cost analysis with insights and breakdowns
         """
-        return self.get_cost_data(
-            filter_={"resource.name": resource_name},
-            bq_project_id=bq_project_id,
-            bq_dataset=bq_dataset,
-            bq_table=bq_table,
-            start_date=kwargs.get('start_date', ''),
-            end_date=kwargs.get('end_date', '')
-        )
+        from google.cloud import bigquery
+        from datetime import datetime, timedelta
+
+        # Set default dates if not provided
+        start_date = kwargs.get('start_date')
+        end_date = kwargs.get('end_date')
+        
+        if not start_date or not end_date:
+            today = datetime.today()
+            start_date = today.replace(day=1).strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+
+        try:
+            client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
+            
+            # Query for specific resource costs
+            query = f"""
+                SELECT
+                    DATE(usage_start_time) as date,
+                    service.description as service_name,
+                    COALESCE(CAST(location.location AS STRING), 'UNKNOWN') as location,
+                    SUM(cost) as daily_cost
+                FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
+                WHERE 
+                    usage_start_time >= '{start_date}'
+                    AND usage_end_time <= '{end_date}'
+                    AND resource.name = '{resource_name}'
+                GROUP BY date, service_name, location
+                ORDER BY date
+            """
+            
+            query_job = client.query(query)
+            results = list(query_job)
+            
+            # Analyze the resource cost data
+            resource_analysis = {
+                "resource_id": resource_name,
+                "resource_type": "GCP Resource",
+                "period": {"start": start_date, "end": end_date},
+                "granularity": "Daily",
+                "total_cost": 0.0,
+                "total_periods": 0,
+                "active_periods": 0,
+                "cost_periods": [],
+                "cost_breakdown": {
+                    "by_service": {},
+                    "by_location": {}
+                },
+                "utilization_insights": [],
+                "cost_trends": [],
+                "recommendations": []
+            }
+            
+            # Process results
+            costs = []
+            service_costs = {}
+            location_costs = {}
+            
+            for row in results:
+                date = row["date"].strftime("%Y-%m-%d") if row["date"] else "unknown"
+                service_name = row["service_name"] if row["service_name"] else "Unknown Service"
+                location = row["location"] if row["location"] else "Unknown Location"
+                cost = float(row["daily_cost"]) if row["daily_cost"] is not None else 0.0
+                
+                resource_analysis["total_cost"] += cost
+                resource_analysis["total_periods"] += 1
+                
+                if cost > 0:
+                    resource_analysis["active_periods"] += 1
+                
+                resource_analysis["cost_periods"].append({
+                    "date": date,
+                    "service": service_name,
+                    "location": location,
+                    "cost": cost
+                })
+                costs.append(cost)
+                
+                # Aggregate by service
+                if service_name not in service_costs:
+                    service_costs[service_name] = 0.0
+                service_costs[service_name] += cost
+                
+                # Aggregate by location
+                if location not in location_costs:
+                    location_costs[location] = 0.0
+                location_costs[location] += cost
+            
+            # Build cost breakdown
+            resource_analysis["cost_breakdown"]["by_service"] = service_costs
+            resource_analysis["cost_breakdown"]["by_location"] = location_costs
+            
+            # Calculate utilization insights
+            if resource_analysis["total_periods"] > 0:
+                utilization_rate = resource_analysis["active_periods"] / resource_analysis["total_periods"]
+                resource_analysis["utilization_insights"].append(
+                    f"Resource utilization rate: {utilization_rate:.1%} ({resource_analysis['active_periods']} active out of {resource_analysis['total_periods']} periods)"
+                )
+                
+                if utilization_rate < 0.5:
+                    resource_analysis["utilization_insights"].append("Low resource utilization detected - consider stopping or downsizing")
+                elif utilization_rate > 0.9:
+                    resource_analysis["utilization_insights"].append("High resource utilization detected - consider scaling up if needed")
+
+            # Calculate cost trends
+            if len(costs) >= 2:
+                first_half = costs[:len(costs)//2]
+                second_half = costs[len(costs)//2:]
+                
+                if first_half and second_half:
+                    first_avg = sum(first_half) / len(first_half)
+                    second_avg = sum(second_half) / len(second_half)
+                    
+                    if first_avg > 0:
+                        growth_rate = ((second_avg - first_avg) / first_avg) * 100
+                        if growth_rate > 10:
+                            resource_analysis["cost_trends"].append(f"Resource cost trend: Increasing ({growth_rate:.1f}% growth)")
+                        elif growth_rate < -10:
+                            resource_analysis["cost_trends"].append(f"Resource cost trend: Decreasing ({abs(growth_rate):.1f}% reduction)")
+                        else:
+                            resource_analysis["cost_trends"].append("Resource cost trend: Stable")
+
+            # Generate recommendations
+            if resource_analysis["total_cost"] > 0:
+                avg_cost = resource_analysis["total_cost"] / resource_analysis["total_periods"]
+                
+                if avg_cost > 10:  # High cost threshold
+                    resource_analysis["recommendations"].append("High resource costs detected - review resource type and consider committed use discounts")
+                
+                if resource_analysis["active_periods"] < resource_analysis["total_periods"] * 0.3:
+                    resource_analysis["recommendations"].append("Low resource activity - consider stopping resources during idle periods")
+                
+                # Service-specific recommendations
+                if service_costs:
+                    top_service = max(service_costs.items(), key=lambda x: x[1])
+                    top_percentage = (top_service[1] / resource_analysis["total_cost"]) * 100
+                    resource_analysis["recommendations"].append(
+                        f"Top service: {top_service[0]} ({top_percentage:.1f}% of total) - review for optimization"
+                    )
+                
+                # Location-specific recommendations
+                if location_costs:
+                    top_location = max(location_costs.items(), key=lambda x: x[1])
+                    location_percentage = (top_location[1] / resource_analysis["total_cost"]) * 100
+                    resource_analysis["recommendations"].append(
+                        f"Primary location: {top_location[0]} ({location_percentage:.1f}% of total) - consider multi-region optimization"
+                    )
+                
+                # Add resource-specific insights
+                if len(costs) > 0:
+                    max_cost = max(costs)
+                    min_cost = min(costs)
+                    cost_variance = max_cost - min_cost
+                    
+                    if cost_variance > avg_cost:
+                        resource_analysis["recommendations"].append("High cost variability detected - review usage patterns")
+                    else:
+                        resource_analysis["recommendations"].append("Consistent cost pattern - resource usage is stable")
+                
+                resource_analysis["recommendations"].append(
+                    f"Resource {resource_name} analysis complete - review GCP Cost Management for detailed breakdowns"
+                )
+
+            return resource_analysis
+            
+        except Exception as e:
+            return {"error": f"Failed to analyze resource costs: {str(e)}"}
 
 
 class GCPFinOpsOptimization:

@@ -294,6 +294,7 @@ settings.local.*
 
 # Test files
 test_individual.py
+pilot.py
 
 # Test reports
 tests/test_reports/

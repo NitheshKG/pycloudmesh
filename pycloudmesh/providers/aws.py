@@ -58,6 +58,18 @@ class AWSReservationCost:
         except boto3.exceptions.Boto3Error as e:
             return {"error": f"Failed to fetch reservation utilization: {str(e)}"}
 
+    def get_reservation_recommendation(self, **kwargs) -> dict:
+        """
+        Get AWS reservation purchase recommendations (alias for get_reservation_purchase_recommendation).
+
+        Args:
+            **kwargs: Same parameters as get_reservation_purchase_recommendation
+
+        Returns:
+            dict: Reservation purchase recommendations from AWS Cost Explorer
+        """
+        return self.get_reservation_purchase_recommendation(**kwargs)
+
     def get_reservation_purchase_recommendation(self, **kwargs) -> dict:
         """
         Get AWS reservation purchase recommendations for various services using Cost Explorer.

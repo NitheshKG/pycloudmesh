@@ -39,6 +39,46 @@ costs = aws.get_cost_data(
     granularity="DAILY",
     group_by=[{"Type": "DIMENSION", "Key": "SERVICE"}]
 )
+print(costs)
+```
+
+**Sample Response:**
+```json
+[
+    {
+        "TimePeriod": {
+            "Start": "2024-01-01",
+            "End": "2024-01-02"
+        },
+        "Total": {
+            "UnblendedCost": {
+                "Amount": "45.25",
+                "Unit": "USD"
+            }
+        },
+        "Groups": [
+            {
+                "Keys": ["Amazon EC2"],
+                "Metrics": {
+                    "UnblendedCost": {
+                        "Amount": "25.50",
+                        "Unit": "USD"
+                    }
+                }
+            },
+            {
+                "Keys": ["Amazon S3"],
+                "Metrics": {
+                    "UnblendedCost": {
+                        "Amount": "19.75",
+                        "Unit": "USD"
+                    }
+                }
+            }
+        ],
+        "Estimated": true
+    }
+]
 ```
 
 ---
@@ -71,6 +111,35 @@ analysis = aws.get_cost_analysis(
     end_date="2024-01-31",
     dimensions=["SERVICE", "REGION"]
 )
+print(analysis)
+```
+
+**Sample Response:**
+```json
+{
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "dimensions": ["SERVICE", "REGION"],
+    "total_cost": 1250.75,
+    "cost_breakdown": {
+        "Amazon EC2": 650.50,
+        "Amazon S3": 350.25,
+        "Amazon RDS": 250.00
+    },
+    "top_services": [
+        {"service": "Amazon EC2", "cost": 650.50, "percentage": 52.0},
+        {"service": "Amazon S3", "cost": 350.25, "percentage": 28.0},
+        {"service": "Amazon RDS", "cost": 250.00, "percentage": 20.0}
+    ],
+    "cost_trends": [
+        {"date": "2024-01-01", "cost": 40.25},
+        {"date": "2024-01-02", "cost": 42.50}
+    ],
+    "insights": [
+        "Amazon EC2 represents 52% of total costs",
+        "Consider reserved instances for cost optimization",
+        "S3 costs are within expected range"
+    ]
+}
 ```
 
 ---
@@ -99,10 +168,112 @@ trends = aws.get_cost_trends(
     end_date="2024-01-31",
     granularity="DAILY"
 )
+print(trends)
+```
+
+**Sample Response:**
+```json
+{
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "granularity": "DAILY",
+    "total_periods": 31,
+    "total_cost": 1250.75,
+    "average_daily_cost": 40.35,
+    "trend_direction": "increasing",
+    "growth_rate": 8.5,
+    "patterns": ["weekend_spikes", "monthly_cycle"],
+    "insights": [
+        "Costs are trending upward by 8.5%",
+        "Peak usage occurs on weekends",
+        "Consider optimization for cost reduction"
+    ],
+    "peak_periods": ["2024-01-15", "2024-01-22"],
+    "cost_periods": [
+        {"date": "2024-01-01", "cost": 38.25},
+        {"date": "2024-01-02", "cost": 42.50},
+        {"date": "2024-01-03", "cost": 41.75}
+    ]
+}
 ```
 
 ### get_resource_costs
-Detailed usage, parameters, and examples here.
+Provides comprehensive resource cost analysis with utilization insights and optimization recommendations.
+
+**Signature:**
+```python
+def get_aws_resource_costs(
+    self,
+    resource_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    granularity: str = "DAILY"
+) -> Dict[str, Any]:
+```
+
+**Parameters:**
+- `resource_id` (str): AWS resource ID (e.g., EC2 instance ID, RDS instance ARN)
+- `start_date` (str, optional): Start date for cost data (YYYY-MM-DD)
+- `end_date` (str, optional): End date for cost data (YYYY-MM-DD)
+- `granularity` (str): Data granularity (DAILY, MONTHLY). Default: "DAILY"
+
+**Returns:**
+- Dictionary with comprehensive resource cost analysis including:
+  - `resource_id`: Resource identifier
+  - `resource_type`: Resource type classification
+  - `period`: Time period covered
+  - `granularity`: Data granularity
+  - `total_cost`: Total cost calculation
+  - `total_periods`: Number of periods analyzed
+  - `active_periods`: Periods with costs > 0
+  - `cost_periods`: Detailed daily cost breakdown
+  - `cost_breakdown`: Usage type breakdown
+  - `utilization_insights`: Utilization analysis and recommendations
+  - `cost_trends`: Cost trend analysis
+  - `recommendations`: Optimization recommendations
+
+**Example:**
+```python
+resource_costs = aws.get_aws_resource_costs(
+    resource_id="i-1234567890abcdef0",
+    start_date="2024-06-01",
+    end_date="2024-06-30"
+)
+print(resource_costs)
+```
+
+**Sample Response:**
+```json
+{
+   "resource_id": "i-1234567890abcdef0",
+   "resource_type": "EC2 Instance",
+   "period": {"start": "2024-06-01", "end": "2024-06-30"},
+   "granularity": "DAILY",
+   "total_cost": 150.75,
+   "total_periods": 30,
+   "active_periods": 28,
+   "cost_periods": [
+      {"date": "2024-06-01", "cost": 5.25},
+      {"date": "2024-06-02", "cost": 5.25}
+   ],
+   "cost_breakdown": {
+      "compute": 140.50,
+      "storage": 10.25
+   },
+   "utilization_insights": {
+      "utilization_score": 0.85,
+      "idle_days": 2,
+      "recommendations": ["Consider stopping during off-hours"]
+   },
+   "cost_trends": {
+      "trend_direction": "stable",
+      "daily_average": 5.38
+   },
+   "recommendations": [
+      "Consider reserved instances for cost savings",
+      "Review idle periods for optimization opportunities"
+   ]
+}
+```
 
 ## 2. Budget Management
 
@@ -130,6 +301,80 @@ def list_budgets(
 **Example:**
 ```python
 budgets = aws.list_budgets(account_id="123456789012")
+print(budgets)
+```
+
+**Sample Response:**
+```json
+{
+    "Budgets": [
+        {
+            "BudgetName": "Monthly Budget",
+            "BudgetLimit": {
+                "Amount": "1000.00",
+                "Unit": "USD"
+            },
+            "TimeUnit": "MONTHLY",
+            "BudgetType": "COST",
+            "CalculatedSpend": {
+                "ActualSpend": {
+                    "Amount": "750.25",
+                    "Unit": "USD"
+                },
+                "ForecastedSpend": {
+                    "Amount": "950.00",
+                    "Unit": "USD"
+                }
+            },
+            "TimePeriod": {
+                "Start": "2024-01-01T00:00:00Z",
+                "End": "2024-12-31T23:59:59Z"
+            },
+            "LastUpdatedTime": "2024-01-15T10:30:00.123000+00:00",
+            "CostTypes": {
+                "IncludeTax": true,
+                "IncludeSubscription": true,
+                "UseBlended": false,
+                "IncludeRefund": true,
+                "IncludeCredit": true,
+                "IncludeUpfront": true,
+                "IncludeRecurring": true,
+                "IncludeOtherSubscription": true,
+                "IncludeSupport": true,
+                "IncludeDiscount": true,
+                "UseAmortized": false
+            }
+        }
+    ],
+    "ResponseMetadata": {
+        "RequestId": "398fb9d7-4a39-4f5b-bef0-1e4be3301173",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "date": "Sun, 27 Jul 2025 11:54:03 GMT",
+            "content-type": "application/x-amz-json-1.1",
+            "content-length": "11917",
+            "connection": "keep-alive",
+            "x-amzn-requestid": "398fb9d7-4a39-4f5b-bef0-1e4be3301173",
+            "cache-control": "no-store, no-cache"
+        },
+        "RetryAttempts": 0
+    }
+}
+```
+
+**Note:** When using `json.dumps()` to print the response, use a custom JSON encoder to handle datetime objects:
+```python
+import json
+from datetime import datetime
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+# Usage
+print(json.dumps(budgets, indent=4, cls=DateTimeEncoder))
 ```
 
 ---
@@ -164,10 +409,50 @@ def create_budget(
 **Example:**
 ```python
 budget = aws.create_budget(
-    account_id="123456789012",
+    aws_account_id="123456789012",
     budget_name="Monthly Budget",
-    budget_amount=1000.0
+    budget_amount=1000.0,
+    notifications=[
+        {
+            "Notification": {
+                "NotificationType": "ACTUAL",
+                "ComparisonOperator": "GREATER_THAN",
+                "Threshold": 80.0,
+                "ThresholdType": "PERCENTAGE"
+            },
+            "Subscribers": [
+                {"SubscriptionType": "EMAIL", "Address": "admin@example.com"}
+            ]
+        }
+    ]
 )
+print(budget)
+```
+
+**Sample Response:**
+```json
+{
+    "ResponseMetadata": {
+        "RequestId": "6b13740c-5eb5-4179-bb9b-0ab8a12fe91b",
+        "HTTPStatusCode": 200,
+        "HTTPHeaders": {
+            "date": "Sun, 27 Jul 2025 10:37:12 GMT",
+            "content-type": "application/x-amz-json-1.1",
+            "content-length": "2",
+            "connection": "keep-alive",
+            "x-amzn-requestid": "6b13740c-5eb5-4179-bb9b-0ab8a12fe91b",
+            "cache-control": "no-store, no-cache"
+        },
+        "RetryAttempts": 0
+    }
+}
+```
+
+**Error Response (Duplicate Budget):**
+```json
+{
+    "error": "Failed to create budget: An error occurred (DuplicateRecordException) when calling the CreateBudget operation: Error creating budget: Monthly Budget - the budget already exists."
+}
 ```
 
 ---
@@ -197,6 +482,41 @@ alerts = aws.get_budget_notifications(
     account_id="123456789012",
     budget_name="Monthly Budget"
 )
+print(alerts)
+```
+
+**Sample Response:**
+```json
+{
+    "Notifications": [
+        {
+            "NotificationType": "ACTUAL",
+            "ComparisonOperator": "GREATER_THAN",
+            "Threshold": 80.0,
+            "ThresholdType": "PERCENTAGE",
+            "NotificationState": "ALARM",
+            "Subscribers": [
+                {
+                    "SubscriptionType": "EMAIL",
+                    "Address": "admin@example.com"
+                }
+            ]
+        },
+        {
+            "NotificationType": "FORECASTED",
+            "ComparisonOperator": "GREATER_THAN",
+            "Threshold": 100.0,
+            "ThresholdType": "PERCENTAGE",
+            "NotificationState": "OK",
+            "Subscribers": [
+                {
+                    "SubscriptionType": "EMAIL",
+                    "Address": "admin@example.com"
+                }
+            ]
+        }
+    ]
+}
 ```
 
 ## 3. Optimization & Recommendations

@@ -74,12 +74,12 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 **Azure:**  
 [ list_budgets ](docs/provider/azure/README.md#list_budgets)  
 [ create_budget ](docs/provider/azure/README.md#create_budget)
-[ get_budget ](docs/provider/azure/README.md#get_budget)
+[ get_budget_notifications ](docs/provider/azure/README.md#get_budget_notifications)
 
 **GCP:**  
 [ list_budgets ](docs/provider/gcp/README.md#list_budgets)  
 [ create_budget ](docs/provider/gcp/README.md#create_budget)  
-[ get_budget_alerts ](docs/provider/gcp/README.md#get_budget_alerts)
+[ get_budget_notifications ](docs/provider/gcp/README.md#get_budget_notifications)
 
 ### 3. Optimization & Recommendations
 

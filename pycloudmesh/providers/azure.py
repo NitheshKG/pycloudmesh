@@ -384,14 +384,14 @@ class AzureBudgetManagement:
                     pass
             return {"error": f"Failed to create budget: {str(e)}{error_detail}"}
 
-    def get_budget(self, 
+    def get_budget_notifications(self, 
                    budget_name: str, 
                    scope: str, 
                    /, 
                    *, 
                    api_version: str = "2024-08-01") -> Dict[str, Any]:
         """
-        Get a specific budget by name and scope.
+        Get notifications for a specific budget by name and scope.
 
         Args:
             budget_name (str): Name of the budget to retrieve
@@ -405,7 +405,7 @@ class AzureBudgetManagement:
             requests.exceptions.RequestException: If Azure API call fails
 
         Example:
-            >>> azure.get_budget(budget_name="monthly-budget", scope="/subscriptions/your-subscription-id/")
+            >>> azure.get_budget_notifications(budget_name="monthly-budget", scope="/subscriptions/your-subscription-id/")
         """
         try:
             headers = {"Authorization": f"Bearer {self.token}"}
@@ -758,39 +758,165 @@ class AzureCostManagement:
         self,
         scope: str,
         resource_id: str,
-        granularity: str, 
+        granularity: str = "Daily", 
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
         metrics: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Get costs for a specific resource.
+        Get detailed cost analysis for a specific resource.
 
         Args:
             scope (str): Azure scope (subscription, resource group, billing account, etc.)
             resource_id (str): ID of the resource to get costs for
+            granularity (str): Data granularity (Daily, Monthly, etc.)
             start_date (Optional[str]): Start date for cost data
             end_date (Optional[str]): End date for cost data
+            metrics (Optional[str]): Cost metrics to analyze
 
         Returns:
-            Dict[str, Any]: Resource cost data
+            Dict[str, Any]: Detailed resource cost analysis with insights and breakdowns
         """
-        # Use a direct dimensions filter for a single resource
-        filter_ = {
-                    "dimensions": {
-                        "name": "ResourceId",
-                        "operator": "In",
-                        "values": [resource_id]
-                    }
+        from datetime import datetime, timedelta
+
+        # Set default dates if not provided
+        if not start_date or not end_date:
+            today = datetime.today()
+            start_date = today.replace(day=1).strftime("%Y-%m-%d")
+            end_date = today.strftime("%Y-%m-%d")
+
+        try:
+            # Use a direct dimensions filter for a single resource
+            filter_ = {
+                "dimensions": {
+                    "name": "ResourceId",
+                    "operator": "In",
+                    "values": [resource_id]
                 }
-        return self.get_cost_data(
-            scope,
-            granularity=granularity,
-            start_date=start_date,
-            end_date=end_date,
-            metrics=metrics,
-            filter_=filter_
-        )
+            }
+            
+            # Get raw cost data for the specific resource
+            cost_data = self.get_cost_data(
+                scope,
+                granularity=granularity,
+                start_date=start_date,
+                end_date=end_date,
+                metrics=metrics,
+                filter_=filter_
+            )
+
+            # If error, return immediately
+            if isinstance(cost_data, dict) and "error" in cost_data:
+                return cost_data
+
+            # Analyze the resource cost data
+            resource_analysis = {
+                "resource_id": resource_id,
+                "resource_type": "Azure Resource",
+                "period": {"start": start_date, "end": end_date},
+                "granularity": granularity,
+                "total_cost": 0.0,
+                "total_periods": 0,
+                "active_periods": 0,
+                "cost_periods": [],
+                "cost_breakdown": {},
+                "utilization_insights": [],
+                "cost_trends": [],
+                "recommendations": []
+            }
+
+            # Process the cost data
+            properties = cost_data.get("properties", {})
+            columns = properties.get("columns", [])
+            rows = properties.get("rows", [])
+            
+            # Find cost column index
+            cost_col_idx = None
+            date_col_idx = None
+            for idx, col in enumerate(columns):
+                name = col.get("name", "").lower()
+                if name in ["pretaxcost", "actualcost", "costusd", "cost"]:
+                    cost_col_idx = idx
+                if "date" in name:
+                    date_col_idx = idx
+
+            # Process rows
+            costs = []
+            for row in rows:
+                cost = float(row[cost_col_idx]) if cost_col_idx is not None and row[cost_col_idx] is not None else 0.0
+                date = row[date_col_idx] if date_col_idx is not None else "unknown"
+                
+                resource_analysis["total_cost"] += cost
+                resource_analysis["total_periods"] += 1
+                
+                if cost > 0:
+                    resource_analysis["active_periods"] += 1
+                
+                resource_analysis["cost_periods"].append({
+                    "date": date,
+                    "cost": cost
+                })
+                costs.append(cost)
+
+            # Calculate utilization insights
+            if resource_analysis["total_periods"] > 0:
+                utilization_rate = resource_analysis["active_periods"] / resource_analysis["total_periods"]
+                resource_analysis["utilization_insights"].append(
+                    f"Resource utilization rate: {utilization_rate:.1%} ({resource_analysis['active_periods']} active out of {resource_analysis['total_periods']} periods)"
+                )
+                
+                if utilization_rate < 0.5:
+                    resource_analysis["utilization_insights"].append("Low resource utilization detected - consider stopping or downsizing")
+                elif utilization_rate > 0.9:
+                    resource_analysis["utilization_insights"].append("High resource utilization detected - consider scaling up if needed")
+
+            # Calculate cost trends
+            if len(costs) >= 2:
+                first_half = costs[:len(costs)//2]
+                second_half = costs[len(costs)//2:]
+                
+                if first_half and second_half:
+                    first_avg = sum(first_half) / len(first_half)
+                    second_avg = sum(second_half) / len(second_half)
+                    
+                    if first_avg > 0:
+                        growth_rate = ((second_avg - first_avg) / first_avg) * 100
+                        if growth_rate > 10:
+                            resource_analysis["cost_trends"].append(f"Resource cost trend: Increasing ({growth_rate:.1f}% growth)")
+                        elif growth_rate < -10:
+                            resource_analysis["cost_trends"].append(f"Resource cost trend: Decreasing ({abs(growth_rate):.1f}% reduction)")
+                        else:
+                            resource_analysis["cost_trends"].append("Resource cost trend: Stable")
+
+            # Generate recommendations
+            if resource_analysis["total_cost"] > 0:
+                avg_cost = resource_analysis["total_cost"] / resource_analysis["total_periods"]
+                
+                if avg_cost > 10:  # High cost threshold
+                    resource_analysis["recommendations"].append("High resource costs detected - review resource type and consider reserved instances")
+                
+                if resource_analysis["active_periods"] < resource_analysis["total_periods"] * 0.3:
+                    resource_analysis["recommendations"].append("Low resource activity - consider stopping resources during idle periods")
+                
+                # Add resource-specific insights
+                if len(costs) > 0:
+                    max_cost = max(costs)
+                    min_cost = min(costs)
+                    cost_variance = max_cost - min_cost
+                    
+                    if cost_variance > avg_cost:
+                        resource_analysis["recommendations"].append("High cost variability detected - review usage patterns")
+                    else:
+                        resource_analysis["recommendations"].append("Consistent cost pattern - resource usage is stable")
+                
+                resource_analysis["recommendations"].append(
+                    f"Resource {resource_id} analysis complete - review Azure Cost Management for detailed breakdowns"
+                )
+
+            return resource_analysis
+            
+        except Exception as e:
+            return {"error": f"Failed to analyze resource costs: {str(e)}"}
 
 
 class AzureFinOpsOptimization:

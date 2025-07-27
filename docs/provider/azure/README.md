@@ -59,34 +59,28 @@ costs = azure.get_cost_data(
     granularity="Monthly",
     group_by=["ServiceName"]
 )
+print(costs)
+```
 
-# Cost per resource per month
-costs = azure.get_cost_data(
-    "/providers/Microsoft.Billing/billingAccounts/your-billing-account-id",
-    granularity="Monthly",
-    group_by=["ResourceId"]
-)
-
-# Cost per service per day (trend)
-costs = azure.get_cost_data(
-    "/providers/Microsoft.Billing/billingAccounts/your-billing-account-id",
-    granularity="Daily",
-    group_by=["ServiceName"]
-)
-
-# Cost per subscription (billing account scope)
-costs = azure.get_cost_data(
-    "/providers/Microsoft.Billing/billingAccounts/your-billing-account-id",
-    granularity="Monthly",
-    group_by=["SubscriptionId"]
-)
-
-# Cost per resource group (subscription scope)
-costs = azure.get_cost_data(
-    "/subscriptions/your-subscription-id/",
-    granularity="Monthly",
-    group_by=["ResourceGroupName"]
-)
+**Sample Response:**
+```json
+{
+    "id": "subscriptions/your-subscription-id/providers/Microsoft.CostManagement/query/abc123",
+    "name": "abc123",
+    "type": "Microsoft.CostManagement/query",
+    "properties": {
+        "columns": [
+            {"name": "Cost", "type": "Number"},
+            {"name": "BillingMonth", "type": "Datetime"},
+            {"name": "ServiceName", "type": "String"}
+        ],
+        "rows": [
+            [125.50, "2024-01-01T00:00:00", "Virtual Machines"],
+            [85.25, "2024-01-01T00:00:00", "Storage"],
+            [45.75, "2024-01-01T00:00:00", "SQL Database"]
+        ]
+    }
+}
 ```
 
 **Note:**
@@ -132,6 +126,30 @@ analysis = azure.get_cost_analysis(
     end_date="2024-01-31",
     dimensions=["ResourceType", "ResourceLocation"]
 )
+print(analysis)
+```
+
+**Sample Response:**
+```json
+{
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "dimensions": ["ResourceType", "ResourceLocation"],
+    "total_cost": 1250.75,
+    "cost_breakdown": {
+        "Microsoft.Compute/virtualMachines": 650.50,
+        "Microsoft.Storage/storageAccounts": 350.25,
+        "Microsoft.Sql/servers": 250.00
+    },
+    "cost_trends": [
+        {"date": "2024-01-01", "cost": 40.25},
+        {"date": "2024-01-02", "cost": 42.50}
+    ],
+    "insights": [
+        "Virtual Machines represent 52% of total costs",
+        "Consider reserved instances for cost optimization",
+        "Storage costs are within expected range"
+    ]
+}
 ```
 
 ---
@@ -179,20 +197,34 @@ trends = azure.get_cost_trends(
     end_date="2024-01-31",
     granularity="Daily"
 )
-
-# Access trend insights
-print(f"Trend direction: {trends['trend_direction']}")
-print(f"Growth rate: {trends['growth_rate']:.1f}%")
-print(f"Patterns: {trends['patterns']}")
-print(f"Insights: {trends['insights']}")
+print(trends)
 ```
 
-**Sample Output:**
+**Sample Response:**
 ```json
 {
-  "period": {"start": "2024-01-01", "end": "2024-01-31"},
-  "granularity": "Daily",
-  "total_periods": 31,
+    "period": {"start": "2024-01-01", "end": "2024-01-31"},
+    "granularity": "Daily",
+    "total_periods": 31,
+    "total_cost": 1250.75,
+    "average_daily_cost": 40.35,
+    "trend_direction": "increasing",
+    "growth_rate": 8.5,
+    "patterns": ["weekend_spikes", "monthly_cycle"],
+    "insights": [
+        "Costs are trending upward by 8.5%",
+        "Peak usage occurs on weekends",
+        "Consider optimization for cost reduction"
+    ],
+    "peak_periods": ["2024-01-15", "2024-01-22"],
+    "low_periods": ["2024-01-05", "2024-01-12"],
+    "cost_periods": [
+        {"date": "2024-01-01", "cost": 38.25},
+        {"date": "2024-01-02", "cost": 42.50},
+        {"date": "2024-01-03", "cost": 41.75}
+    ]
+}
+```
   "total_cost": 1250.75,
   "average_daily_cost": 40.35,
   "trend_direction": "increasing",
@@ -210,7 +242,7 @@ print(f"Insights: {trends['insights']}")
 ```
 
 ### get_resource_costs
-Get costs for a specific resource.
+Provides comprehensive resource cost analysis with utilization insights and optimization recommendations.
 
 **Signature:**
 ```python
@@ -218,7 +250,7 @@ def get_resource_costs(
     self,
     scope: str,
     resource_id: str,
-    granularity: str,
+    granularity: str = "Daily", 
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     metrics: Optional[str] = None
@@ -228,23 +260,69 @@ def get_resource_costs(
 **Parameters:**
 - `scope` (str): Azure scope (subscription, resource group, billing account, etc.)
 - `resource_id` (str): ID of the resource to get costs for
-- `granularity` (str): Data granularity ("Daily", "Monthly", etc.)
+- `granularity` (str): Data granularity (Daily, Monthly). Default: "Daily"
 - `start_date` (str, optional): Start date for cost data
 - `end_date` (str, optional): End date for cost data
-- `metrics` (str, optional): Cost metrics to retrieve
+- `metrics` (str, optional): Cost metrics to include
 
 **Returns:**
-- Dict[str, Any]: Resource cost data
+- Dictionary with comprehensive resource cost analysis including:
+  - `resource_id`: Resource identifier
+  - `resource_type`: Resource type classification
+  - `period`: Time period covered
+  - `granularity`: Data granularity
+  - `total_cost`: Total cost calculation
+  - `total_periods`: Number of periods analyzed
+  - `active_periods`: Periods with costs > 0
+  - `cost_periods`: Detailed daily cost breakdown
+  - `cost_breakdown`: Usage type breakdown
+  - `utilization_insights`: Utilization analysis and recommendations
+  - `cost_trends`: Cost trend analysis
+  - `recommendations`: Optimization recommendations
 
 **Example:**
 ```python
 resource_costs = azure.get_resource_costs(
-    "/subscriptions/your-subscription-id/",
-    "/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.Compute/virtualMachines/your-vm",
-    granularity="Daily",
-    start_date="2024-01-01",
-    end_date="2024-01-31"
+    scope="/subscriptions/your-subscription-id/",
+    resource_id="/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.Compute/virtualMachines/your-vm",
+    start_date="2024-06-01",
+    end_date="2024-06-30"
 )
+print(resource_costs)
+```
+
+**Sample Response:**
+```json
+{
+   "resource_id": "/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.Compute/virtualMachines/your-vm",
+   "resource_type": "Microsoft.Compute/virtualMachines",
+   "period": {"start": "2024-06-01", "end": "2024-06-30"},
+   "granularity": "Daily",
+   "total_cost": 150.75,
+   "total_periods": 30,
+   "active_periods": 28,
+   "cost_periods": [
+      {"date": "2024-06-01", "cost": 5.25},
+      {"date": "2024-06-02", "cost": 5.25}
+   ],
+   "cost_breakdown": {
+      "compute": 140.50,
+      "storage": 10.25
+   },
+   "utilization_insights": {
+      "utilization_score": 0.85,
+      "idle_days": 2,
+      "recommendations": ["Consider stopping during off-hours"]
+   },
+   "cost_trends": {
+      "trend_direction": "stable",
+      "daily_average": 5.38
+   },
+   "recommendations": [
+      "Consider reserved instances for cost savings",
+      "Review idle periods for optimization opportunities"
+   ]
+}
 ```
 
 ## 2. Budget Management
@@ -271,6 +349,64 @@ def list_budgets(
 **Example:**
 ```python
 budgets = azure.list_budgets(scope="/subscriptions/your-subscription-id/")
+print(budgets)
+```
+
+**Sample Response:**
+```json
+{
+    "value": [
+        {
+            "id": "/subscriptions/your-subscription-id/providers/Microsoft.Consumption/budgets/Monthly Budget",
+            "name": "Monthly Budget",
+            "type": "Microsoft.Consumption/budgets",
+            "properties": {
+                "amount": 1000.0,
+                "timeGrain": "Monthly",
+                "timePeriod": {
+                    "startDate": "2024-01-01T00:00:00Z",
+                    "endDate": "2024-12-31T23:59:59Z"
+                },
+                "currentSpend": {
+                    "amount": 750.25,
+                    "unit": "USD"
+                },
+                "notifications": {
+                    "actual_80": {
+                        "enabled": true,
+                        "operator": "GreaterThan",
+                        "threshold": 80.0,
+                        "contactEmails": ["admin@example.com"]
+                    }
+                }
+            }
+        },
+        {
+            "id": "/subscriptions/your-subscription-id/providers/Microsoft.Consumption/budgets/Quarterly Budget",
+            "name": "Quarterly Budget",
+            "type": "Microsoft.Consumption/budgets",
+            "properties": {
+                "amount": 3000.0,
+                "timeGrain": "Quarterly",
+                "timePeriod": {
+                    "startDate": "2024-01-01T00:00:00Z",
+                    "endDate": "2024-12-31T23:59:59Z"
+                },
+                "currentSpend": {
+                    "amount": 2250.75,
+                    "unit": "USD"
+                }
+            }
+        }
+    ]
+}
+```
+
+**Error Response (Authentication):**
+```json
+{
+    "error": "Failed to list budgets: 401 Client Error: Unauthorized for url: https://management.azure.com/subscriptions/your-subscription-id/providers/Microsoft.Consumption/budgets?api-version=2024-08-01 - {\"error\":{\"code\":\"ExpiredAuthenticationToken\",\"message\":\"The access token has expired.\"}}"
+}
 ```
 
 ---
@@ -336,16 +472,55 @@ budget = azure.create_budget(
     ],
     time_grain="Monthly"
 )
+print(budget)
+```
+
+**Sample Response:**
+```json
+{
+    "id": "/subscriptions/your-subscription-id/providers/Microsoft.Consumption/budgets/Monthly Azure Budget",
+    "name": "Monthly Azure Budget",
+    "type": "Microsoft.Consumption/budgets",
+    "properties": {
+        "amount": 3000.0,
+        "timeGrain": "Monthly",
+        "timePeriod": {
+            "startDate": "2024-01-01T00:00:00Z",
+            "endDate": "2024-12-31T23:59:59Z"
+        },
+        "notifications": {
+            "actual_80": {
+                "enabled": true,
+                "operator": "GreaterThan",
+                "threshold": 80.0,
+                "contactEmails": ["admin@example.com", "finance@example.com"]
+            },
+            "actual_100": {
+                "enabled": true,
+                "operator": "GreaterThanOrEqualTo",
+                "threshold": 100.0,
+                "contactEmails": ["emergency@example.com"]
+            }
+        }
+    }
+}
+```
+
+**Error Response (Authentication):**
+```json
+{
+    "error": "Failed to create budget: 401 Client Error: Unauthorized for url: https://management.azure.com/subscriptions/your-subscription-id/providers/Microsoft.Consumption/budgets/Monthly%20Azure%20Budget?api-version=2024-08-01 - {\"error\":{\"code\":\"ExpiredAuthenticationToken\",\"message\":\"The access token has expired.\"}}"
+}
 ```
 
 ---
 
-### get_budget
-Get a specific budget by name and scope.
+### get_budget_notifications
+Get notifications for a specific budget by name and scope.
 
 **Signature:**
 ```python
-def get_budget(
+def get_budget_notifications(
     self,
     budget_name: str,
     scope: str,
@@ -363,10 +538,53 @@ def get_budget(
 
 **Example:**
 ```python
-budget = azure.get_budget(
+budget = azure.get_budget_notifications(
     budget_name="Monthly Azure Budget",
     scope="/subscriptions/your-subscription-id/"
 )
+print(budget)
+```
+
+**Sample Response:**
+```json
+{
+    "id": "/subscriptions/your-subscription-id/providers/Microsoft.Consumption/budgets/Monthly Azure Budget",
+    "name": "Monthly Azure Budget",
+    "type": "Microsoft.Consumption/budgets",
+    "properties": {
+        "amount": 1000.0,
+        "timeGrain": "Monthly",
+        "timePeriod": {
+            "startDate": "2024-01-01T00:00:00Z",
+            "endDate": "2024-12-31T23:59:59Z"
+        },
+        "currentSpend": {
+            "amount": 750.25,
+            "unit": "USD"
+        },
+        "notifications": {
+            "actual_80": {
+                "enabled": true,
+                "operator": "GreaterThan",
+                "threshold": 80.0,
+                "contactEmails": ["admin@example.com", "finance@example.com"]
+            },
+            "actual_100": {
+                "enabled": true,
+                "operator": "GreaterThanOrEqualTo",
+                "threshold": 100.0,
+                "contactEmails": ["emergency@example.com"]
+            }
+        }
+    }
+}
+```
+
+**Error Response (Not Found):**
+```json
+{
+    "error": "Failed to get budget: 404 Client Error: Not Found for url: https://management.azure.com/subscriptions/your-subscription-id/providers/Microsoft.Consumption/budgets/nonexistent-budget?api-version=2024-08-01"
+}
 ```
 
 ## 3. Optimization & Recommendations

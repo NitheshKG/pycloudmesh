@@ -49,49 +49,110 @@ costs = gcp.get_cost_data(
 print(costs)
 ```
 
+**Sample Response:**
+```json
+{
+    "period": {"start": "2024-06-01", "end": "2024-06-30"},
+    "granularity": "Daily",
+    "metrics": ["cost"],
+    "group_by": ["service.description"],
+    "cost_data": [
+        {
+            "description": "Compute Engine",
+            "total_cost": 450.25
+        },
+        {
+            "description": "Cloud Storage",
+            "total_cost": 125.50
+        },
+        {
+            "description": "BigQuery",
+            "total_cost": 75.25
+        },
+        {
+            "description": "Cloud Logging",
+            "total_cost": 25.00
+        }
+    ]
+}
+```
+
 ---
 
 ### get_cost_analysis
-Provides summarized cost analysis with GCP-specific dimensions (wrapper for get_cost_data).
+Provides comprehensive cost analysis with insights, breakdowns, and actionable recommendations.
 
 **Signature:**
 ```python
 def get_cost_analysis(
     self,
+    bq_project_id: str,
+    bq_dataset: str,
+    bq_table: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    bq_project_id: Optional[str] = None,
-    bq_dataset: Optional[str] = None,
-    bq_table: Optional[str] = None
 ) -> Dict[str, Any]:
 ```
 
 **Parameters:**
+- `bq_project_id` (str): BigQuery project ID for billing export (required).
+- `bq_dataset` (str): BigQuery dataset name for billing export (required).
+- `bq_table` (str): BigQuery table name for billing export (required).
 - `start_date` (str, optional): Start date for analysis.
 - `end_date` (str, optional): End date for analysis.
-- `bq_project_id` (str, optional): BigQuery project ID for billing export.
-- `bq_dataset` (str, optional): BigQuery dataset name for billing export.
-- `bq_table` (str, optional): BigQuery table name for billing export.
 
 **Returns:**
-- Dictionary with cost analysis data (grouped by ["service", "location", "project"]).
+- Dictionary with comprehensive cost analysis including:
+  - `period`: Time period covered
+  - `dimensions`: Analysis dimensions used (service, location, project)
+  - `total_cost`: Total cost calculation
+  - `cost_breakdown`: Service-wise cost breakdown
+  - `top_services`: Top 5 services by cost
+  - `cost_trends`: Cost trends over time
+  - `insights`: Percentage analysis and recommendations
 
 **Example:**
 ```python
 analysis = gcp.get_cost_analysis(
-    start_date="2024-06-01",
-    end_date="2024-06-30",
     bq_project_id="your-bq-project",
     bq_dataset="your_billing_dataset",
-    bq_table="your_billing_table"
+    bq_table="your_billing_table",
+    start_date="2024-06-01",
+    end_date="2024-06-30"
 )
 print(analysis)
+```
+
+**Sample Response:**
+```json
+{
+   "period": {"start": "2024-06-01", "end": "2024-06-30"},
+   "dimensions": ["service", "location", "project"],
+   "total_cost": 450.25,
+   "cost_breakdown": {
+      "Compute Engine": 200.50,
+      "Cloud Storage": 150.75,
+      "BigQuery": 99.00
+   },
+   "top_services": [
+      {"service": "Compute Engine", "cost": 200.50, "percentage": 44.6},
+      {"service": "Cloud Storage", "cost": 150.75, "percentage": 33.5}
+   ],
+   "cost_trends": [
+      {"date": "2024-06-01", "cost": 15.25},
+      {"date": "2024-06-02", "cost": 14.75}
+   ],
+   "insights": [
+      "Compute Engine represents 44.6% of total costs",
+      "Consider rightsizing recommendations for cost optimization"
+   ]
+}
 ```
 
 ---
 
 ### get_cost_trends
-Analyzes cost trends over time with GCP-specific granularity (wrapper for get_cost_data).
+Analyzes cost trends over time with daily granularity and comprehensive trend analysis.
 
 **Signature:**
 ```python
@@ -100,7 +161,6 @@ def get_cost_trends(
     bq_project_id: str,
     bq_dataset: str,
     bq_table: str,
-    granularity: str = "Daily",
     **kwargs
 ) -> Dict[str, Any]:
 ```
@@ -109,12 +169,22 @@ def get_cost_trends(
 - `bq_project_id` (str): BigQuery project ID for billing export.
 - `bq_dataset` (str): BigQuery dataset name for billing export.
 - `bq_table` (str): BigQuery table name for billing export.
-- `granularity` (str, optional): Data granularity for trends. Defaults to "Daily".
 - `start_date` (str, optional, in kwargs): Start date for trend analysis.
 - `end_date` (str, optional, in kwargs): End date for trend analysis.
 
 **Returns:**
-- Dictionary with cost trends data.
+- Dictionary with comprehensive cost trends data including:
+  - `period`: Time period covered
+  - `granularity`: Data granularity (Daily)
+  - `total_periods`: Number of periods analyzed
+  - `total_cost`: Total cost for the period
+  - `average_daily_cost`: Average daily cost
+  - `trend_direction`: Cost trend direction (increasing/decreasing/stable)
+  - `growth_rate`: Percentage growth rate
+  - `patterns`: Identified cost patterns
+  - `insights`: Trend insights and recommendations
+  - `peak_periods`: Periods with highest costs
+  - `cost_periods`: Daily cost breakdown
 
 **Example:**
 ```python
@@ -122,17 +192,36 @@ trends = gcp.get_cost_trends(
     bq_project_id="your-bq-project",
     bq_dataset="your_billing_dataset",
     bq_table="your_billing_table",
-    granularity="Daily",
     start_date="2024-06-01",
     end_date="2024-06-30"
 )
 print(trends)
 ```
 
+**Sample Response:**
+```json
+{
+   "period": {"start": "2024-06-01", "end": "2024-06-30"},
+   "granularity": "Daily",
+   "total_periods": 30,
+   "total_cost": 450.25,
+   "average_daily_cost": 15.01,
+   "trend_direction": "increasing",
+   "growth_rate": 12.5,
+   "patterns": ["weekend_spikes", "monthly_cycle"],
+   "insights": ["Costs are trending upward", "Consider optimization"],
+   "peak_periods": ["2024-06-15", "2024-06-22"],
+   "cost_periods": [
+      {"date": "2024-06-01", "cost": 12.50},
+      {"date": "2024-06-02", "cost": 14.75}
+   ]
+}
+```
+
 ---
 
 ### get_resource_costs
-Fetches cost data for a specific resource (wrapper for get_cost_data with filter).
+Provides comprehensive resource cost analysis with utilization insights and optimization recommendations.
 
 **Signature:**
 ```python
@@ -155,7 +244,19 @@ def get_resource_costs(
 - `end_date` (str, optional, in kwargs): End date for cost data.
 
 **Returns:**
-- Resource cost data.
+- Dictionary with comprehensive resource cost analysis including:
+  - `resource_id`: Resource identifier
+  - `resource_type`: Resource type classification
+  - `period`: Time period covered
+  - `granularity`: Data granularity
+  - `total_cost`: Total cost calculation
+  - `total_periods`: Number of periods analyzed
+  - `active_periods`: Periods with costs > 0
+  - `cost_periods`: Detailed daily cost breakdown
+  - `cost_breakdown`: Usage type breakdown
+  - `utilization_insights`: Utilization analysis and recommendations
+  - `cost_trends`: Cost trend analysis
+  - `recommendations`: Optimization recommendations
 
 **Example:**
 ```python
@@ -168,6 +269,40 @@ resource_costs = gcp.get_resource_costs(
     end_date="2024-06-30"
 )
 print(resource_costs)
+```
+
+**Sample Response:**
+```json
+{
+   "resource_id": "your-resource-name",
+   "resource_type": "compute_instance",
+   "period": {"start": "2024-06-01", "end": "2024-06-30"},
+   "granularity": "Daily",
+   "total_cost": 150.75,
+   "total_periods": 30,
+   "active_periods": 28,
+   "cost_periods": [
+      {"date": "2024-06-01", "cost": 5.25},
+      {"date": "2024-06-02", "cost": 5.25}
+   ],
+   "cost_breakdown": {
+      "compute": 140.50,
+      "storage": 10.25
+   },
+   "utilization_insights": {
+      "utilization_score": 0.85,
+      "idle_days": 2,
+      "recommendations": ["Consider stopping during off-hours"]
+   },
+   "cost_trends": {
+      "trend_direction": "stable",
+      "daily_average": 5.38
+   },
+   "recommendations": [
+      "Consider committed use discounts for cost savings",
+      "Review idle periods for optimization opportunities"
+   ]
+}
 ```
 
 > **Note:** The filter key for resource_name must match your BigQuery schema (e.g., use `resource.name` if that's the column name).
@@ -202,10 +337,78 @@ budgets = gcp.list_budgets(
 print(budgets)
 ```
 
+**Sample Response:**
+```json
+{
+    "budgets": [
+        {
+            "name": "billingAccounts/your-billing-account/budgets/your-budget-id",
+            "display_name": "Monthly GCP Budget",
+            "budget_filter": {
+                "projects": ["projects/your-project"],
+                "credit_types_treatment": "INCLUDE_ALL_CREDITS"
+            },
+            "amount": {
+                "specified_amount": {
+                    "currency_code": "USD",
+                    "units": "2000",
+                    "nanos": 0
+                }
+            },
+            "threshold_rules": [
+                {
+                    "threshold_percent": 0.5,
+                    "spend_basis": "CURRENT_SPEND"
+                },
+                {
+                    "threshold_percent": 0.8,
+                    "spend_basis": "CURRENT_SPEND"
+                },
+                {
+                    "threshold_percent": 1.0,
+                    "spend_basis": "CURRENT_SPEND"
+                }
+            ]
+        },
+        {
+            "name": "billingAccounts/your-billing-account/budgets/your-quarterly-budget-id",
+            "display_name": "Quarterly GCP Budget",
+            "budget_filter": {
+                "projects": ["projects/your-project"],
+                "credit_types_treatment": "INCLUDE_ALL_CREDITS"
+            },
+            "amount": {
+                "specified_amount": {
+                    "currency_code": "USD",
+                    "units": "5000",
+                    "nanos": 0
+                }
+            },
+            "threshold_rules": [
+                {
+                    "threshold_percent": 0.7,
+                    "spend_basis": "CURRENT_SPEND"
+                },
+                {
+                    "threshold_percent": 1.0,
+                    "spend_basis": "CURRENT_SPEND"
+                }
+            ]
+        }
+    ]
+}
+```
+
+**Error Response (Not Found):**
+```json
+{
+    "error": "Failed to list budgets: 404 Client Error: Not Found for url: https://billingbudgets.googleapis.com/v1/billingAccounts/invalid-billing-account/budgets"
+}
+```
+
 ---
 
 ### create_budget
-<!--
 Creates a new GCP budget.
 
 **Signature:**
@@ -215,7 +418,8 @@ def create_budget(
     billing_account: str,
     budget_name: str,
     amount: float,
-    currency_code: str = "USD"
+    currency_code: str = "USD",
+    notifications: List[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
 ```
 
@@ -224,6 +428,7 @@ def create_budget(
 - `budget_name` (str): Name of the budget.
 - `amount` (float): Budget amount.
 - `currency_code` (str, optional): Currency code for the budget. Defaults to "USD".
+- `notifications` (List[Dict[str, Any]], optional): List of notification configurations.
 
 **Returns:**
 - Budget creation response.
@@ -233,34 +438,116 @@ def create_budget(
 budget = gcp.create_budget(
     billing_account="your-billing-account",
     budget_name="Monthly GCP Budget",
-    amount=2000.0
+    amount=2000.0,
+    notifications=[
+        {
+            "displayName": "Budget Alert",
+            "pubsubTopic": "projects/your-project/topics/budget-alerts",
+            "schemaVersion": "1.0",
+            "monitoringNotificationChannels": ["projects/your-project/notificationChannels/123456789"]
+        }
+    ]
 )
+print(budget)
 ```
--->
 
-> **TODO:** The `create_budget` feature for GCP is currently not working and is under development. This section will be updated once the feature is available.
+**Sample Response:**
+```json
+{
+    "name": "billingAccounts/your-billing-account/budgets/your-budget-id",
+    "displayName": "Monthly GCP Budget",
+    "budgetFilter": {
+        "projects": ["projects/your-project"]
+    },
+    "amount": {
+        "specifiedAmount": {
+            "currencyCode": "USD",
+            "units": "2000"
+        }
+    },
+    "thresholdRules": [
+        {
+            "thresholdPercent": 0.5,
+            "spendBasis": "CURRENT_SPEND"
+        },
+        {
+            "thresholdPercent": 0.8,
+            "spendBasis": "CURRENT_SPEND"
+        },
+        {
+            "thresholdPercent": 1.0,
+            "spendBasis": "CURRENT_SPEND"
+        }
+    ],
+    "notificationsRule": {
+        "pubsubTopic": "projects/your-project/topics/budget-alerts",
+        "schemaVersion": "1.0",
+        "monitoringNotificationChannels": ["projects/your-project/notificationChannels/123456789"]
+    },
+    "etag": "\"abc123\""
+}
+```
+
+**Error Response (Not Implemented):**
+```json
+{
+    "error": "The create_budget feature for GCP is currently not working and is under development."
+}
+```
+
+> **Note:** The `create_budget` feature for GCP is currently under development. This section shows the expected interface and response format for when the feature becomes available.
 
 ---
 
-### get_budget_alerts
+### get_budget_notifications
 
-Retrieve all alerts configured for a specific GCP budget.
+Retrieve all notifications configured for a specific GCP budget.
 
 **Parameters:**
 - `billing_account` (str): GCP billing account ID (required)
 - `budget_display_name` (str): Display name of the budget (required)
 
 **Returns:**
-A dictionary with budget alert information, or an error message.
+A dictionary with budget notification information, or an error message.
 
 **Example:**
 ```python
 gcp = gcp_client("your_project_id", "/path/to/credentials.json")
-alerts = gcp.get_budget_alerts(
+notifications = gcp.get_budget_notifications(
     billing_account="012345-678901-ABCDEF",
     budget_display_name="monthly-budget"
 )
-print(alerts)
+print(notifications)
+```
+
+**Sample Response:**
+```json
+{
+    "budget_name": "billingAccounts/012345-678901-ABCDEF/budgets/your-budget-id",
+    "display_name": "monthly-budget",
+    "threshold_rules": [
+        {
+            "threshold_percent": 0.5,
+            "spend_basis": "CURRENT_SPEND"
+        },
+        {
+            "threshold_percent": 0.8,
+            "spend_basis": "CURRENT_SPEND"
+        },
+        {
+            "threshold_percent": 1.0,
+            "spend_basis": "CURRENT_SPEND"
+        }
+    ],
+    "message": "GCP budget alerts are delivered via Cloud Monitoring and/or Pub/Sub. To receive notifications, ensure you have set up notification channels in the budget configuration."
+}
+```
+
+**Error Response (Not Found):**
+```json
+{
+    "error": "Budget with display name 'nonexistent-budget' not found."
+}
 ```
 
 ## 3. Optimization & Recommendations

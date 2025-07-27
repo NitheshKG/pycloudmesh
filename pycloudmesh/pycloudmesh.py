@@ -590,7 +590,7 @@ class AWSProvider(CloudProvider):
                 Defaults to "COST".
             time_unit (str, optional): Time unit for the budget. One of "MONTHLY", "QUARTERLY", "ANNUALLY".
                 Defaults to "MONTHLY".
-            notifications_with_subscribers (list, optional): List of notification dicts for budget alerts.
+            notifications (list, optional): List of notification dicts for budget alerts.
                 Each dict should contain:
                     - Notification: {
                         "NotificationType": "ACTUAL" or "FORECASTED",
@@ -613,7 +613,7 @@ class AWSProvider(CloudProvider):
             ...     budget_amount=1000.0,
             ...     budget_type="COST",
             ...     time_unit="MONTHLY",
-            ...     notifications_with_subscribers=[
+            ...     notifications=[
             ...         {
             ...             "Notification": {
             ...                 "NotificationType": "ACTUAL",
@@ -634,7 +634,7 @@ class AWSProvider(CloudProvider):
             budget_amount=kwargs.get('budget_amount'),
             budget_type=kwargs.get('budget_type', 'COST'),
             time_unit=kwargs.get('time_unit', 'MONTHLY'),
-            notifications_with_subscribers=kwargs.get('notifications_with_subscribers')
+            notifications_with_subscribers=kwargs.get('notifications')
         )
     
     def get_budget_notifications(self, **kwargs) -> Dict[str, Any]:
@@ -1289,12 +1289,12 @@ class AzureProvider(CloudProvider):
             api_version=kwargs.get('api_version', '2024-08-01')
         )
     
-    def get_budget(self, 
+    def get_budget_notifications(self, 
                    budget_name: str, 
                    scope: str, 
                    **kwargs) -> Dict[str, Any]:
         """
-        Get a specific budget by name and scope.
+        Get notifications for a specific budget by name and scope.
 
         Args:
             budget_name (str): Name of the budget to retrieve
@@ -1309,9 +1309,9 @@ class AzureProvider(CloudProvider):
             requests.exceptions.RequestException: If Azure API call fails
 
         Example:
-            >>> azure.get_budget(budget_name="monthly-budget", scope="/subscriptions/your-subscription-id/")
+            >>> azure.get_budget_notifications(budget_name="monthly-budget", scope="/subscriptions/your-subscription-id/")
         """
-        return self.budget_client.get_budget(
+        return self.budget_client.get_budget_notifications(
             budget_name,
             scope,
             api_version=kwargs.get('api_version', '2024-08-01')
@@ -1470,7 +1470,7 @@ class GCPProvider(CloudProvider):
         including budget details and pagination information.
 
         Args:
-            gcp_billing_account (str, optional): GCP billing account ID.
+            gcp_billing_account str: GCP billing account ID.
             gcp_max_results (int, optional): Maximum number of results to return.
 
         Returns:
@@ -1944,28 +1944,28 @@ class GCPProvider(CloudProvider):
             currency_code=kwargs.get('currency_code', 'USD')
         )
     
-    def get_budget_alerts(self, **kwargs) -> Dict[str, Any]:
+    def get_budget_notifications(self, **kwargs) -> Dict[str, Any]:
         """
-        Get alerts for a specific GCP budget.
+        Get notifications for a specific GCP budget.
 
         This method retrieves all alerts configured for a specific budget.
 
         Args:
-            billing_account (str, optional): GCP billing account ID.
-            budget_display_name (str, optional): Display name of the budget.
+            billing_account str: GCP billing account ID.
+            budget_name str: Display name of the budget.
 
         Returns:
-            Dict[str, Any]: Budget alerts from GCP. If the API call fails, returns a dictionary with an "error" key and message.
+            Dict[str, Any]: Budget notifications from GCP. If the API call fails, returns a dictionary with an "error" key and message.
 
         Example:
-            >>> gcp.get_budget_alerts(
+            >>> gcp.get_budget_notifications(
             ...     billing_account="012345-678901-ABCDEF",
             ...     budget_display_name="monthly-budget"
             ... )
         """
-        return self.budget_client.get_budget_alerts(
+        return self.budget_client.get_budget_notifications(
             billing_account=kwargs.get('billing_account'),
-            budget_display_name=kwargs.get('budget_display_name')
+            budget_display_name=kwargs.get('budget_name')
         )
     
     def get_machine_type_recommendations(self) -> Dict[str, Any]:
