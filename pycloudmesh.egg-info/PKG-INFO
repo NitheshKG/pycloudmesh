@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: pycloudmesh
-Version: 1.0.0
+Version: 1.0.1
 Summary: Unified FinOps and cost analytics toolkit for AWS, Azure, and GCP. Provides programmatic access to cloud cost, budgeting, optimization, and governance APIs.
 Home-page: https://github.com/NitheshKG/pycloudmesh
 Author: Nithesh
