@@ -79,7 +79,11 @@ print(costs)
             [85.25, "2024-01-01T00:00:00", "Storage"],
             [45.75, "2024-01-01T00:00:00", "SQL Database"]
         ]
-    }
+    },
+    "total_items": 3,
+    "pages_retrieved": 1,
+    "has_more_pages": false,
+    "request_type": "POST"
 }
 ```
 
@@ -203,9 +207,9 @@ print(trends)
 **Sample Response:**
 ```json
 {
-    "period": {"start": "2024-01-01", "end": "2024-01-31"},
-    "granularity": "Daily",
-    "total_periods": 31,
+  "period": {"start": "2024-01-01", "end": "2024-01-31"},
+  "granularity": "Daily",
+  "total_periods": 31,
     "total_cost": 1250.75,
     "average_daily_cost": 40.35,
     "trend_direction": "increasing",
@@ -617,6 +621,47 @@ advisor_recs = azure.get_advisor_recommendations()
 advisor_recs = azure.get_advisor_recommendations(filter="Category eq 'Cost'")
 ```
 
+**Sample Response:**
+```json
+{
+    "value": [
+        {
+            "id": "/subscriptions/your-subscription-id/providers/Microsoft.Advisor/recommendations/12345678-1234-1234-1234-123456789012",
+            "name": "12345678-1234-1234-1234-123456789012",
+            "type": "Microsoft.Advisor/recommendations",
+            "properties": {
+                "category": "Cost",
+                "impact": "Medium",
+                "impactedField": "Microsoft.Compute/virtualMachines",
+                "impactedValue": "your-vm-name",
+                "lastUpdated": "2024-01-15T10:30:00Z",
+                "recommendationTypeId": "e0754024-cd3b-4fa4-ac41-884e4caaa31f",
+                "shortDescription": {
+                    "problem": "Consider using Azure Reserved Instances",
+                    "solution": "Purchase reserved instances to reduce costs"
+                },
+                "longDescription": {
+                    "problem": "Your virtual machines are running on-demand pricing which is more expensive than reserved instances.",
+                    "solution": "Purchase reserved instances for 1 or 3 years to save up to 72% on compute costs."
+                },
+                "resourceMetadata": {
+                    "resourceId": "/subscriptions/your-subscription-id/resourceGroups/your-rg/providers/Microsoft.Compute/virtualMachines/your-vm",
+                    "source": "Azure Advisor"
+                },
+                "potentialSavings": {
+                    "amount": 1200.00,
+                    "currency": "USD"
+                }
+            }
+        }
+    ],
+    "total_items": 1,
+    "pages_retrieved": 1,
+    "has_more_pages": false,
+    "request_type": "GET"
+}
+```
+
 ---
 
 ### get_reserved_instance_recommendations
@@ -646,6 +691,41 @@ reserved_recs = azure.get_reserved_instance_recommendations(
     scope="/subscriptions/your-subscription-id",
     filter="ResourceGroup eq 'MyResourceGroup'"
 )
+```
+
+**Sample Response:**
+```json
+{
+    "value": [
+        {
+            "id": "/subscriptions/your-subscription-id/providers/Microsoft.Consumption/reservationRecommendations/12345678-1234-1234-1234-123456789012",
+            "name": "12345678-1234-1234-1234-123456789012",
+            "type": "Microsoft.Consumption/reservationRecommendations",
+            "properties": {
+                "scope": "Shared",
+                "region": "eastus",
+                "lookBackPeriod": "Last30Days",
+                "instanceFlexibilityRatio": 1,
+                "instanceFlexibilityGroup": "DSv3 Series",
+                "normalizedSize": "Standard_D2s_v3",
+                "recommendedQuantity": 2,
+                "meterId": "00000000-0000-0000-0000-000000000000",
+                "term": "P1Y",
+                "costWithNoReservedInstances": 175.20,
+                "recommendedQuantityNormalized": 2,
+                "totalCostWithReservedInstances": 87.60,
+                "netSavings": 87.60,
+                "firstUsageDate": "2024-01-01T00:00:00Z",
+                "skuName": "Standard_D2s_v3",
+                "resourceType": "virtualMachines"
+            }
+        }
+    ],
+    "total_items": 1,
+    "pages_retrieved": 1,
+    "has_more_pages": false,
+    "request_type": "GET"
+}
 ```
 
 ---
@@ -688,8 +768,7 @@ optimizations = azure.get_optimization_recommendations(
 ## 4. Advanced Analytics
 
 ### get_cost_forecast
-
-Fetches a cost forecast for the specified period and scope using Azure Cost Management API.
+Get unified cost forecast for the specified period with AI/ML enhanced predictions and statistical analysis.
 
 **Signature:**
 ```python
@@ -699,9 +778,85 @@ def get_cost_forecast(
     api_version: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    forecast_period: int = 12,
+    forecast_period: int = 30,
     payload: Optional[dict] = None
 ) -> Dict[str, Any]:
+```
+
+**Parameters:**
+- `scope` (str): Azure scope (subscription, resource group, billing account, etc.)
+- `api_version` (str): API version for the Azure Cost Management API
+- `start_date` (str, optional): Start date for historical data (YYYY-MM-DD). Defaults to 3 months ago.
+- `end_date` (str, optional): End date for historical data (YYYY-MM-DD). Defaults to today.
+- `forecast_period` (int, optional): Number of days to forecast. Default: 12.
+- `payload` (dict, optional): Custom payload for the query. If not provided, uses default payload.
+
+**Returns:**
+- Dictionary with unified cost forecast data including:
+  - `forecast_period`: Number of days forecasted
+  - `start_date`: Historical data start date
+  - `end_date`: Historical data end date
+  - `total_historical_cost`: Total cost for historical period
+  - `total_forecast_cost`: Total forecasted cost
+  - `average_daily_cost`: Average daily cost
+  - `forecast_results`: Daily forecast values with confidence intervals
+  - `ai_model_used`: Whether AI model was used
+  - `model_accuracy`: Accuracy metrics (MAPE, RMSE, MAE)
+  - `insights`: Cost insights and trends
+  - `granularity`: Data granularity
+  - `message`: Status message
+
+**Example:**
+```python
+forecast = azure.get_cost_forecast(
+    scope="/subscriptions/your-subscription-id/",
+    api_version="2025-03-01",
+    start_date="2025-05-01",
+    end_date="2025-07-31",
+    forecast_period=30
+)
+print(forecast)
+```
+
+**Sample Response:**
+```json
+{
+    "forecast_period": 30,
+    "start_date": "2025-05-01",
+    "end_date": "2025-07-31",
+    "total_historical_cost": 326.84,
+    "total_forecast_cost": 383.4,
+    "average_daily_cost": 13.62,
+    "forecast_results": [
+        {
+            "date": "2025-07-30",
+            "forecast_value": 12.78,
+            "lower_bound": 6.8,
+            "upper_bound": 18.76,
+            "confidence_level": 0.95
+        },
+        {
+            "date": "2025-07-31",
+            "forecast_value": 12.78,
+            "lower_bound": 6.8,
+            "upper_bound": 18.76,
+            "confidence_level": 0.95
+        }
+    ],
+    "ai_model_used": false,
+    "model_accuracy": {
+        "mape": 12.28,
+        "rmse": 3.05,
+        "mean_absolute_error": 1.67
+    },
+    "insights": [
+        "Historical average daily cost: 13.62",
+        "Recent 7-day trend: 5.1% change",
+        "Forecasted total cost for 30 days: 383.40"
+    ],
+    "granularity": "Daily",
+    "message": "Unified cost forecast generated for 30 days using statistical analysis"
+}
 ```
 
 ---
@@ -955,7 +1110,24 @@ anomalies = azure.get_cost_anomalies(
     }
   ],
   "total_records": 1,
-  "cost_data": { ... }
+  "cost_data": {
+    "properties": {
+      "nextLink": null,
+      "columns": [
+        {"name": "Cost", "type": "Number"},
+        {"name": "UsageDate", "type": "Number"},
+        {"name": "Currency", "type": "String"}
+      ],
+      "rows": [
+        [150.25, "20240115", "USD"],
+        [75.50, "20240116", "USD"]
+      ]
+    },
+    "total_items": 2,
+    "pages_retrieved": 1,
+    "has_more_pages": false,
+    "request_type": "POST"
+  }
 }
 ```
 
@@ -1021,31 +1193,32 @@ efficiency = azure.get_cost_efficiency_metrics(
 ```json
 {
   "efficiency_metrics": {
-    "total_cost": 1250.75,
+    "total_cost": 329.41,
     "cost_by_service": {
-      "Virtual Machines": 450.25,
-      "Storage": 300.50,
-      "Network": 200.00,
-      "Other": 300.00
+      "Bandwidth": 0.0,
+      "Storage": 95.38,
+      "Virtual Machines": 0.0,
+      "Virtual Network": 234.02
     },
-    "period": {"start": "2024-01-01", "end": "2024-01-31"},
-    "total_days_analyzed": 31,
-    "cost_per_user": 12.51,
-    "cost_per_transaction": 0.125,
-    "avg_daily_cost": 40.35,
-    "cost_stddev": 8.25,
-    "cost_variance_ratio": 0.204,
-    "cost_efficiency_score": 0.898,
-    "waste_days": 3,
-    "waste_percentage": 9.7
+    "period": {"start": "2025-07-01", "end": "2025-07-29"},
+    "total_days_analyzed": 54,
+    "avg_daily_cost": 6.1,
+    "cost_stddev": 3.72,
+    "cost_variance_ratio": 0.61,
+    "cost_efficiency_score": 0.695,
+    "waste_days": 22,
+    "waste_percentage": 40.7
   }
 }
 ```
 
 ---
 
-### generate_cost_report
-Generate a comprehensive cost report for a given Azure scope, with flexible options for metrics, grouping, and filtering.
+## Cost Reports
+
+### `generate_cost_report`
+
+Generate comprehensive cost report for a given Azure scope with unified format across all cloud providers.
 
 **Signature:**
 ```python
@@ -1058,7 +1231,7 @@ def generate_cost_report(
     metrics: Optional[list] = None,
     group_by: Optional[list] = None,
     filter_: Optional[dict] = None
-) -> Dict[str, Any]:
+) -> Dict[str, Any]
 ```
 
 **Parameters:**
@@ -1074,66 +1247,112 @@ def generate_cost_report(
 - `filter_` (dict, optional): Additional filter criteria for the query.
 
 **Returns:**
-- `Dict[str, Any]`: Cost report, including summary for quarterly/annual types and raw cost data as returned by Azure Cost Management API.
-    - `report_type`: The type of report generated
-    - `period`: Start and end dates
-    - `cost_data`: Raw cost data from Azure API
-    - `summary`: (For quarterly/annual) Aggregated totals by quarter or year
-    - `generated_at`: Timestamp
+- `Dict[str, Any]`: Unified cost report format with processed data
+- For quarterly/annual reports, includes `summary_aggregation` with totals by quarter or year
 
-**Behavior:**
-- If `report_type` is `"monthly"`, defaults to current month.
-- If `"quarterly"`, defaults to last 3 months and includes a summary by quarter.
-- If `"annual"`, defaults to last 12 months and includes a summary by year.
-- If `start_date`/`end_date` are provided, they override the default date range.
-- You can use `metrics`, `group_by`, and `filter_` for advanced customization.
-
-**Examples:**
+**Example:**
 ```python
-# Basic monthly report for a subscription
-report = azure.generate_cost_report(
-    scope="/subscriptions/your-subscription-id/"
+azure = AzureFinOpsAnalytics(subscription_id="your_subscription", token="your_token")
+
+# Monthly report
+monthly_report = azure.generate_cost_report(
+    scope="/subscriptions/your-subscription-id/",
+    report_type="monthly",
+    start_date="2025-07-01",
+    end_date="2025-07-31"
 )
 
-# Quarterly report with summary
-report = azure.generate_cost_report(
+# Quarterly report with summary aggregation
+quarterly_report = azure.generate_cost_report(
     scope="/subscriptions/your-subscription-id/",
     report_type="quarterly"
 )
-
-# Annual report, grouped by service
-report = azure.generate_cost_report(
-    scope="/subscriptions/your-subscription-id/",
-    report_type="annual",
-    group_by=["ServiceName"]
-)
-
-# Custom date range, custom metrics, and filter
-report = azure.generate_cost_report(
-    scope="/subscriptions/your-subscription-id/",
-    start_date="2024-01-01",
-    end_date="2024-03-31",
-    metrics=["Cost"],
-    group_by=["ResourceGroupName"],
-    filter_={
-        "dimensions": {
-            "name": "ResourceGroupName",
-            "operator": "In",
-            "values": ["API", "WebApp"]
-        }
-    }
-)
-
-# Accessing the summary for a quarterly report
-summary = report.get("summary", {})
-for quarter, total in summary.items():
-    print(f"{quarter}: {total}")
 ```
 
-**Notes:**
-- For quarterly and annual reports, the `summary` field provides a dictionary of totals by quarter or year.
-- The `cost_data` field contains the raw Azure API response, which can be further analyzed if needed.
-- See the [get_cost_data](#get_cost_data) section for valid metrics and group_by options for your scope.
+**Sample Response:**
+```json
+{
+    "report_type": "monthly",
+    "period": {
+        "start": "2025-07-01",
+        "end": "2025-07-31"
+    },
+    "generated_at": "2025-07-31T02:10:14.812717",
+    "summary": {
+        "total_cost": 342.262857396059,
+        "total_days": 0,
+        "avg_daily_cost": 0,
+        "min_daily_cost": 0,
+        "max_daily_cost": 0,
+        "unique_services": 4,
+        "unique_regions": 1
+    },
+    "breakdowns": {
+        "by_service": [
+            {
+                "service": "Bandwidth",
+                "total_cost": 6.59311298048125e-05,
+                "avg_daily_cost": 0
+            },
+            {
+                "service": "Storage",
+                "total_cost": 95.3836169510402,
+                "avg_daily_cost": 0
+            },
+            {
+                "service": "Virtual Machines",
+                "total_cost": 0.0,
+                "avg_daily_cost": 0
+            },
+            {
+                "service": "Virtual Network",
+                "total_cost": 246.879174513889,
+                "avg_daily_cost": 0
+            }
+        ],
+        "by_region": [
+            {
+                "region": "us east",
+                "total_cost": 342.26285739606,
+                "avg_daily_cost": 0
+            }
+        ]
+    },
+    "trends": {
+        "daily_costs": []
+    },
+    "cost_drivers": [
+        {
+            "sku": {
+                "id": "Bandwidth",
+                "description": "Bandwidth"
+            },
+            "service": {
+                "id": "Bandwidth",
+                "description": "Bandwidth"
+            },
+            "total_cost": 6.59311298048125e-05
+        },
+        {
+            "sku": {
+                "id": "Storage",
+                "description": "Storage"
+            },
+            "service": {
+                "id": "Storage",
+                "description": "Storage"
+            },
+            "total_cost": 95.3836169510402
+        }
+    ],
+    "efficiency_metrics": {
+        "cost_efficiency_score": 1,
+        "cost_variance_ratio": 0,
+        "cost_stddev": 0
+    },
+    "message": "Comprehensive cost report generated for monthly period."
+}
+```
 
 ## 5. Governance & Compliance
 
@@ -1151,26 +1370,130 @@ def get_governance_policies(self, scope: str, tag_names: Optional[List[str]] = N
 - `tag_names` (List[str], optional): List of tag names to use for cost allocation analysis. If not provided, all available tags will be used.
 
 **Returns:**
-- `Dict[str, Any]`: Dictionary with keys:
-    - `'cost_allocation_by_tags'`: Cost allocation analysis grouped by tags/dimensions
-    - `'policy_compliance'`: Compliance status for cost-related policies
-    - `'cost_policies'`: List of cost-related governance policies
+- `Dict[str, Any]`: Dictionary with unified structure:
+    - `cost_allocation_labels`: Cost allocation analysis grouped by tags/dimensions (unified with AWS/GCP)
+    - `policy_compliance`: Compliance status for cost-related policies (unified with AWS/GCP) 
+    - `cost_policies`: List of cost-related governance policies
+
+**Note:** This method is designed to return all three sections, but currently only the `policy_compliance` section is fully implemented. The `cost_allocation_labels` and `cost_policies` sections are available as separate methods but not yet integrated into this unified response.
 
 **Example:**
 ```python
-policies = azure.get_governance_policies(
+governance_data = azure.get_governance_policies(
     scope="/subscriptions/your-subscription-id/",
     tag_names=["Environment", "Project"]
 )
+```
 
-# Access cost allocation by tags
-cost_allocation = policies['cost_allocation_by_tags']
-
-# Access policy compliance
-compliance = policies['policy_compliance']
-
-# Access cost-related policies
-cost_policies = policies['cost_policies']
+**Sample Response:**
+```json
+{
+    "cost_allocation_labels": {
+        "tag_groups": [
+            {
+                "tag_name": "Environment",
+                "costs": [
+                    {
+                        "tag_value": "Production",
+                        "cost": 1250.50,
+                        "percentage": 65.2
+                    },
+                    {
+                        "tag_value": "Development",
+                        "cost": 668.30,
+                        "percentage": 34.8
+                    }
+                ]
+            },
+            {
+                "tag_name": "Project",
+                "costs": [
+                    {
+                        "tag_value": "FinOps",
+                        "cost": 1918.80,
+                        "percentage": 100.0
+                    }
+                ]
+            }
+        ],
+        "total_cost": 1918.80,
+        "available_tags": ["Environment", "Project", "Department"],
+        "message": "Cost allocation analysis completed using Azure Cost Management API"
+    },
+    "policy_compliance": {
+        "scope": "/subscriptions/your-subscription-id/",
+        "total_policies": 14,
+        "total_assignments": 0,
+        "cost_related_policies": [
+            {
+                "properties": {
+                    "displayName": "Azure Backup should be enabled for Virtual Machines",
+                    "policyType": "BuiltIn",
+                    "mode": "Indexed",
+                    "description": "Ensure protection of your Azure Virtual Machines by enabling Azure Backup. Azure Backup is a secure and cost effective data protection solution for Azure.",
+                    "metadata": {
+                        "version": "3.0.0",
+                        "category": "Backup"
+                    },
+                    "version": "3.0.0",
+                    "parameters": {
+                        "effect": {
+                            "type": "String",
+                            "metadata": {
+                                "displayName": "Effect",
+                                "description": "Enable or disable the execution of the policy"
+                            },
+                            "allowedValues": [
+                                "AuditIfNotExists",
+                                "Disabled"
+                            ],
+                            "defaultValue": "AuditIfNotExists"
+                        }
+                    }
+                },
+                "id": "/providers/Microsoft.Authorization/policyDefinitions/013e242c-8828-4970-87b3-ab247555486d",
+                "type": "Microsoft.Authorization/policyDefinitions",
+                "name": "013e242c-8828-4970-87b3-ab247555486d"
+            }
+        ],
+        "cost_related_assignments": [],
+        "compliance_score": 0.0,
+        "compliance_status": "Non-compliant",
+        "cost_governance_insights": [
+            "Found 14 cost-related policies",
+            "Active assignments: 0",
+            "Compliance score: 0.0%",
+            "Note: Detailed compliance requires Azure Policy Insights API access"
+        ],
+        "message": "Policy compliance status retrieved from Azure Policy API"
+    },
+    "cost_policies": {
+        "policies": [
+            {
+                "id": "/subscriptions/your-subscription-id/providers/Microsoft.Authorization/policyDefinitions/12345678-1234-1234-1234-123456789012",
+                "name": "Require cost center tag",
+                "description": "Enforces cost center tagging for all resources",
+                "category": "Cost Management",
+                "effect": "Deny",
+                "parameters": {
+                    "tagName": "costCenter"
+                }
+            },
+            {
+                "id": "/subscriptions/your-subscription-id/providers/Microsoft.Authorization/policyDefinitions/87654321-4321-4321-4321-210987654321",
+                "name": "Budget enforcement",
+                "description": "Enforces budget limits for resource groups",
+                "category": "Cost Management",
+                "effect": "Audit",
+                "parameters": {
+                    "budgetAmount": 1000
+                }
+            }
+        ],
+        "total_policies": 2,
+        "message": "Cost management policies retrieved from Azure Policy API"
+    }
+}
 ```
 
 ---
@@ -1342,6 +1665,66 @@ recommendations = azure.get_reservation_recommendation(
     scope="/subscriptions/your-subscription-id/",
     filter="ResourceGroup eq 'Production' and Location eq 'eastus' and Term eq 'P3Y'"
 )
+```
+
+**Sample Response:**
+```json
+{
+    "value": [
+        {
+            "id": "/subscriptions/your-subscription-id/providers/Microsoft.Consumption/reservationRecommendations/12345678-1234-1234-1234-123456789012",
+            "name": "12345678-1234-1234-1234-123456789012",
+            "type": "Microsoft.Consumption/reservationRecommendations",
+            "properties": {
+                "scope": "Shared",
+                "region": "eastus",
+                "lookBackPeriod": "Last30Days",
+                "instanceFlexibilityRatio": 1,
+                "instanceFlexibilityGroup": "DSv3 Series",
+                "normalizedSize": "Standard_D2s_v3",
+                "recommendedQuantity": 2,
+                "meterId": "00000000-0000-0000-0000-000000000000",
+                "term": "P1Y",
+                "costWithNoReservedInstances": 175.20,
+                "recommendedQuantityNormalized": 2,
+                "totalCostWithReservedInstances": 87.60,
+                "netSavings": 87.60,
+                "firstUsageDate": "2024-01-01T00:00:00Z",
+                "scope": "Shared",
+                "skuName": "Standard_D2s_v3",
+                "resourceType": "virtualMachines"
+            }
+        },
+        {
+            "id": "/subscriptions/your-subscription-id/providers/Microsoft.Consumption/reservationRecommendations/87654321-4321-4321-4321-210987654321",
+            "name": "87654321-4321-4321-4321-210987654321",
+            "type": "Microsoft.Consumption/reservationRecommendations",
+            "properties": {
+                "scope": "Single",
+                "region": "westus2",
+                "lookBackPeriod": "Last30Days",
+                "instanceFlexibilityRatio": 1,
+                "instanceFlexibilityGroup": "ESv3 Series",
+                "normalizedSize": "Standard_E2s_v3",
+                "recommendedQuantity": 1,
+                "meterId": "11111111-1111-1111-1111-111111111111",
+                "term": "P3Y",
+                "costWithNoReservedInstances": 262.80,
+                "recommendedQuantityNormalized": 1,
+                "totalCostWithReservedInstances": 131.40,
+                "netSavings": 131.40,
+                "firstUsageDate": "2024-01-15T00:00:00Z",
+                "scope": "Single",
+                "skuName": "Standard_E2s_v3",
+                "resourceType": "virtualMachines"
+            }
+        }
+    ],
+    "total_items": 2,
+    "pages_retrieved": 1,
+    "has_more_pages": false,
+    "request_type": "GET"
+}
 ```
 
 ---

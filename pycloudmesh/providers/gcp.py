@@ -61,7 +61,6 @@ class GCPReservationCost:
         try:
             client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
             
-            # Query for committed use discounts and reservation costs
             query = f"""
                 SELECT
                     DATE(usage_start_time) as date,
@@ -89,11 +88,9 @@ class GCPReservationCost:
             query_job = client.query(query)
             results = list(query_job)
             
-            # Process results
             reservation_data = []
             total_reservation_cost = 0
             
-            # Check if we found any reservation data
             if not results:
                 return {
                     "period": {"start": start_date, "end": end_date},
@@ -109,7 +106,6 @@ class GCPReservationCost:
                 }
             
             for row in results:
-                # Handle None values safely
                 cost = float(row["total_cost"]) if row["total_cost"] is not None else 0.0
                 usage_amount = float(row["usage_amount"]) if row["usage_amount"] is not None else 0.0
                 
@@ -124,7 +120,6 @@ class GCPReservationCost:
                 })
                 total_reservation_cost += cost
             
-            # Get additional reservation insights
             insights_query = f"""
                 SELECT
                     COUNT(DISTINCT DATE(usage_start_time)) as days_with_reservations,
@@ -179,7 +174,6 @@ class GCPReservationCost:
         try:
             recommendations = []
             
-            # Get machine type recommendations (most common reservation type)
             machine_type_parent = f"projects/{self.project_id}/locations/global/recommenders/google.compute.instance.MachineTypeRecommender"
             
             machine_type_request = recommender_v1.ListRecommendationsRequest(
@@ -207,7 +201,6 @@ class GCPReservationCost:
                     "priority": "high" if "cost" in response.description.lower() else "medium"
                 })
             
-            # Get committed use discount recommendations
             try:
                 cud_parent = f"projects/{self.project_id}/locations/global/recommenders/google.compute.commitment.UsageCommitmentRecommender"
                 
@@ -236,10 +229,8 @@ class GCPReservationCost:
                         "priority": "high"
                     })
             except Exception:
-                # Committed use discount recommender might not be available
                 pass
             
-            # Get sustained use discount recommendations
             try:
                 sud_parent = f"projects/{self.project_id}/locations/global/recommenders/google.compute.instance.SustainedUseDiscountRecommender"
                 
@@ -268,18 +259,15 @@ class GCPReservationCost:
                         "priority": "medium"
                     })
             except Exception:
-                # Sustained use discount recommender might not be available
                 pass
             
-            # Sort recommendations by priority and potential savings
             def sort_key(rec):
                 priority_score = {"high": 3, "medium": 2, "low": 1}.get(rec.get("priority", "medium"), 1)
                 cost_savings = float(rec.get("primary_impact", {}).get("cost_projection", {}).get("cost", 0))
-                return (priority_score, -cost_savings)  # Higher priority and cost savings first
+                return (priority_score, -cost_savings)
             
             recommendations.sort(key=sort_key, reverse=True)
             
-            # Add summary statistics
             total_potential_savings = sum(
                 float(rec.get("primary_impact", {}).get("cost_projection", {}).get("cost", 0))
                 for rec in recommendations
@@ -431,10 +419,8 @@ class GCPBudgetManagement:
                     }
                 ]
             }
-            # Add nanos if amount is fractional
             if amount % 1 != 0:
                 budget["amount"]["specified_amount"]["nanos"] = int((amount % 1) * 1e9)
-            # Debug print the payload
             import json
             print("DEBUG BUDGET PAYLOAD:", json.dumps(budget, indent=2, default=str))
             response = self.budget_client.create_budget(request={
@@ -464,13 +450,11 @@ class GCPBudgetManagement:
         """
         try:
             parent = f"billingAccounts/{billing_account}"
-            # List all budgets and find the one with the matching display name
             from google.cloud.billing.budgets_v1 import ListBudgetsRequest
             request = ListBudgetsRequest(parent=parent)
             budgets = self.budget_client.list_budgets(request=request)
             for budget in budgets:
                 if budget.display_name == budget_display_name:
-                    # Return threshold rules and a message about alerting
                     return {
                         "budget_name": budget.name,
                         "display_name": budget.display_name,
@@ -612,7 +596,6 @@ class GCPCostManagement:
         from google.cloud import bigquery
         from datetime import datetime, timedelta
 
-        # Set default dates if not provided
         if not start_date or not end_date:
             today = datetime.today()
             start_date = today.replace(day=1).strftime("%Y-%m-%d")
@@ -621,7 +604,6 @@ class GCPCostManagement:
         try:
             client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
             
-            # Query for cost analysis with service and location breakdown
             query = f"""
                 SELECT
                     service.description as service_name,
@@ -639,7 +621,6 @@ class GCPCostManagement:
             query_job = client.query(query)
             results = list(query_job)
             
-            # Prepare analysis structure
             analysis = {
                 "period": {"start": start_date, "end": end_date},
                 "dimensions": ["service", "location", "project"],
@@ -650,7 +631,6 @@ class GCPCostManagement:
                 "insights": []
             }
             
-            # Process results
             service_costs = {}
             location_costs = {}
             project_costs = {}
@@ -661,24 +641,20 @@ class GCPCostManagement:
                 project_id = row["project_id"] if row["project_id"] else "Unknown Project"
                 cost = float(row["total_cost"]) if row["total_cost"] is not None else 0.0
                 
-                # Aggregate by service
                 if service_name not in service_costs:
                     service_costs[service_name] = 0.0
                 service_costs[service_name] += cost
                 
-                # Aggregate by location
                 if location not in location_costs:
                     location_costs[location] = 0.0
                 location_costs[location] += cost
                 
-                # Aggregate by project
                 if project_id not in project_costs:
                     project_costs[project_id] = 0.0
                 project_costs[project_id] += cost
                 
                 analysis["total_cost"] += cost
                 
-                # Add to cost trends
                 analysis["cost_trends"].append({
                     "service": service_name,
                     "location": location,
@@ -686,23 +662,19 @@ class GCPCostManagement:
                     "cost": cost
                 })
             
-            # Build cost breakdown
             analysis["cost_breakdown"] = {
                 "by_service": service_costs,
                 "by_location": location_costs,
                 "by_project": project_costs
             }
             
-            # Generate top services
             sorted_services = sorted(service_costs.items(), key=lambda x: x[1], reverse=True)
             analysis["top_services"] = [
                 {"service": service, "cost": cost} 
                 for service, cost in sorted_services[:5]
             ]
             
-            # Generate insights
             if analysis["total_cost"] > 0:
-                # Top service insight
                 if sorted_services:
                     top_service = sorted_services[0]
                     top_percentage = (top_service[1] / analysis["total_cost"]) * 100
@@ -710,7 +682,6 @@ class GCPCostManagement:
                         f"Top service '{top_service[0]}' accounts for {top_percentage:.1f}% of total costs"
                     )
                     
-                    # Top 3 services insight
                     if len(sorted_services) >= 3:
                         top3_total = sum(cost for _, cost in sorted_services[:3])
                         top3_percentage = (top3_total / analysis["total_cost"]) * 100
@@ -718,7 +689,6 @@ class GCPCostManagement:
                             f"Top 3 services account for {top3_percentage:.1f}% of total costs"
                         )
                 
-                # Location insight
                 if location_costs:
                     top_location = max(location_costs.items(), key=lambda x: x[1])
                     location_percentage = (top_location[1] / analysis["total_cost"]) * 100
@@ -726,7 +696,6 @@ class GCPCostManagement:
                         f"Top location '{top_location[0]}' accounts for {location_percentage:.1f}% of total costs"
                     )
                 
-                # Project insight
                 if project_costs:
                     top_project = max(project_costs.items(), key=lambda x: x[1])
                     project_percentage = (top_project[1] / analysis["total_cost"]) * 100
@@ -734,7 +703,6 @@ class GCPCostManagement:
                         f"Top project '{top_project[0]}' accounts for {project_percentage:.1f}% of total costs"
                     )
                 
-                # Cost distribution insight
                 if len(sorted_services) > 1:
                     cost_variance = max(service_costs.values()) - min(service_costs.values())
                     if cost_variance > analysis["total_cost"] * 0.5:
@@ -770,7 +738,6 @@ class GCPCostManagement:
         from google.cloud import bigquery
         from datetime import datetime, timedelta
 
-        # Set default dates if not provided
         start_date = kwargs.get('start_date')
         end_date = kwargs.get('end_date')
         
@@ -782,7 +749,6 @@ class GCPCostManagement:
         try:
             client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
             
-            # Query for daily cost trends
             query = f"""
                 SELECT
                     DATE(usage_start_time) as date,
@@ -798,7 +764,6 @@ class GCPCostManagement:
             query_job = client.query(query)
             results = list(query_job)
             
-            # Prepare trends analysis structure
             trends_analysis = {
                 "period": {"start": start_date, "end": end_date},
                 "granularity": "Daily",
@@ -814,7 +779,6 @@ class GCPCostManagement:
                 "insights": []
             }
             
-            # Process results
             costs = []
             for row in results:
                 date = row["date"].strftime("%Y-%m-%d") if row["date"] else "unknown"
@@ -828,11 +792,9 @@ class GCPCostManagement:
                 })
                 costs.append(cost)
             
-            # Calculate average daily cost
             if trends_analysis["total_periods"] > 0:
                 trends_analysis["average_daily_cost"] = trends_analysis["total_cost"] / trends_analysis["total_periods"]
             
-            # Find peak and low periods
             if costs:
                 max_cost = max(costs)
                 min_cost = min(costs)
@@ -843,7 +805,6 @@ class GCPCostManagement:
                     if period["cost"] == min_cost:
                         trends_analysis["low_periods"].append(period)
             
-            # Calculate trend direction and growth rate
             if len(costs) >= 2:
                 first_half = costs[:len(costs)//2]
                 second_half = costs[len(costs)//2:]
@@ -863,9 +824,7 @@ class GCPCostManagement:
                         else:
                             trends_analysis["trend_direction"] = "stable"
             
-            # Generate patterns and insights
             if costs:
-                # Pattern: Check for consistent vs variable costs
                 non_zero_costs = [c for c in costs if c > 0]
                 if non_zero_costs:
                     cost_variance = max(non_zero_costs) - min(non_zero_costs)
@@ -874,12 +833,10 @@ class GCPCostManagement:
                     else:
                         trends_analysis["patterns"].append("Consistent cost pattern")
                 
-                # Pattern: Check for zero-cost periods
                 zero_cost_periods = len([c for c in costs if c == 0])
                 if zero_cost_periods > len(costs) * 0.5:
                     trends_analysis["patterns"].append("Many zero-cost periods")
                 
-                # Insights
                 if trends_analysis["total_cost"] > 0:
                     trends_analysis["insights"].append(
                         f"Total cost over {trends_analysis['total_periods']} periods: ${trends_analysis['total_cost']:.2f}"
@@ -929,7 +886,6 @@ class GCPCostManagement:
         from google.cloud import bigquery
         from datetime import datetime, timedelta
 
-        # Set default dates if not provided
         start_date = kwargs.get('start_date')
         end_date = kwargs.get('end_date')
         
@@ -941,7 +897,6 @@ class GCPCostManagement:
         try:
             client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
             
-            # Query for specific resource costs
             query = f"""
                 SELECT
                     DATE(usage_start_time) as date,
@@ -960,7 +915,6 @@ class GCPCostManagement:
             query_job = client.query(query)
             results = list(query_job)
             
-            # Analyze the resource cost data
             resource_analysis = {
                 "resource_id": resource_name,
                 "resource_type": "GCP Resource",
@@ -979,7 +933,6 @@ class GCPCostManagement:
                 "recommendations": []
             }
             
-            # Process results
             costs = []
             service_costs = {}
             location_costs = {}
@@ -1004,21 +957,17 @@ class GCPCostManagement:
                 })
                 costs.append(cost)
                 
-                # Aggregate by service
                 if service_name not in service_costs:
                     service_costs[service_name] = 0.0
                 service_costs[service_name] += cost
                 
-                # Aggregate by location
                 if location not in location_costs:
                     location_costs[location] = 0.0
                 location_costs[location] += cost
             
-            # Build cost breakdown
             resource_analysis["cost_breakdown"]["by_service"] = service_costs
             resource_analysis["cost_breakdown"]["by_location"] = location_costs
             
-            # Calculate utilization insights
             if resource_analysis["total_periods"] > 0:
                 utilization_rate = resource_analysis["active_periods"] / resource_analysis["total_periods"]
                 resource_analysis["utilization_insights"].append(
@@ -1030,7 +979,6 @@ class GCPCostManagement:
                 elif utilization_rate > 0.9:
                     resource_analysis["utilization_insights"].append("High resource utilization detected - consider scaling up if needed")
 
-            # Calculate cost trends
             if len(costs) >= 2:
                 first_half = costs[:len(costs)//2]
                 second_half = costs[len(costs)//2:]
@@ -1048,17 +996,15 @@ class GCPCostManagement:
                         else:
                             resource_analysis["cost_trends"].append("Resource cost trend: Stable")
 
-            # Generate recommendations
             if resource_analysis["total_cost"] > 0:
                 avg_cost = resource_analysis["total_cost"] / resource_analysis["total_periods"]
                 
-                if avg_cost > 10:  # High cost threshold
+                if avg_cost > 10:
                     resource_analysis["recommendations"].append("High resource costs detected - review resource type and consider committed use discounts")
                 
                 if resource_analysis["active_periods"] < resource_analysis["total_periods"] * 0.3:
                     resource_analysis["recommendations"].append("Low resource activity - consider stopping resources during idle periods")
                 
-                # Service-specific recommendations
                 if service_costs:
                     top_service = max(service_costs.items(), key=lambda x: x[1])
                     top_percentage = (top_service[1] / resource_analysis["total_cost"]) * 100
@@ -1066,7 +1012,6 @@ class GCPCostManagement:
                         f"Top service: {top_service[0]} ({top_percentage:.1f}% of total) - review for optimization"
                     )
                 
-                # Location-specific recommendations
                 if location_costs:
                     top_location = max(location_costs.items(), key=lambda x: x[1])
                     location_percentage = (top_location[1] / resource_analysis["total_cost"]) * 100
@@ -1074,7 +1019,6 @@ class GCPCostManagement:
                         f"Primary location: {top_location[0]} ({location_percentage:.1f}% of total) - consider multi-region optimization"
                     )
                 
-                # Add resource-specific insights
                 if len(costs) > 0:
                     max_cost = max(costs)
                     min_cost = min(costs)
@@ -1224,12 +1168,10 @@ class GCPFinOpsGovernance:
             Dict[str, Any]: Cost allocation labels with usage statistics
         """
         try:
-            # Try to import Resource Manager client
             try:
                 from google.cloud import resourcemanager_v3
                 resource_client = resourcemanager_v3.ProjectsClient(credentials=self.credentials)
                 
-                # Get project labels
                 project_name = f"projects/{self.project_id}"
                 project = resource_client.get_project(name=project_name)
                 project_labels = dict(project.labels) if project.labels else {}
@@ -1238,7 +1180,6 @@ class GCPFinOpsGovernance:
             except Exception:
                 project_labels = {}
             
-            # Get unique labels from BigQuery if a top-level labels field exists
             bq_project_id = kwargs.get('bq_project_id')
             bq_dataset = kwargs.get('bq_dataset')
             bq_table = kwargs.get('bq_table')
@@ -1253,7 +1194,6 @@ class GCPFinOpsGovernance:
                             label_field = field
                             break
                     if label_field:
-                        # Query for all unique label key-value pairs
                         labels_query = f"""
                             SELECT DISTINCT labels
                             FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
@@ -1267,7 +1207,6 @@ class GCPFinOpsGovernance:
                         for row in labels_results:
                             labels_data = row['labels']
                             if labels_data:
-                                # Handle different data types that might be returned
                                 if isinstance(labels_data, dict):
                                     for key, value in labels_data.items():
                                         unique_labels.add((key, value))
@@ -1352,12 +1291,10 @@ class GCPFinOpsGovernance:
                 "overall_status": "unknown"
             }
             
-            # Check project-level policies using Asset API
             try:
                 from google.cloud import asset_v1
                 asset_client = asset_v1.AssetServiceClient(credentials=self.credentials)
                 
-                # Get project assets for compliance checking
                 parent = f"projects/{self.project_id}"
                 request = asset_v1.ListAssetsRequest(
                     parent=parent,
@@ -1385,12 +1322,10 @@ class GCPFinOpsGovernance:
                     "recommendation": "Check project permissions and API enablement"
                 }
             
-            # Check organization policies
             try:
                 from google.cloud import orgpolicy_v2
                 org_policy_client = orgpolicy_v2.OrgPolicyClient(credentials=self.credentials)
                 
-                # Check for common compliance policies
                 constraint_names = [
                     "compute.requireOsLogin",
                     "compute.requireShieldedVm",
@@ -1433,29 +1368,25 @@ class GCPFinOpsGovernance:
                     "status": "error"
                 }
             
-            # Check cost-related policies
             cost_policies = {
                 "budget_alerts_enabled": False,
                 "cost_allocation_enabled": False,
                 "resource_quota_enforced": False,
-                "cost_monitoring_enabled": True  # Assume enabled if we can access
+                "cost_monitoring_enabled": True
             }
             
             try:
-                # Check if budgets exist (basic cost policy)
                 budget_client = BudgetServiceClient(credentials=self.credentials)
                 cost_policies["budget_alerts_enabled"] = True
             except Exception:
                 cost_policies["budget_alerts_enabled"] = False
             
-            # Check if cost allocation is working (BigQuery billing export)
             bq_project_id = kwargs.get('bq_project_id')
             if bq_project_id:
                 cost_policies["cost_allocation_enabled"] = True
             
             compliance_results["cost_policy_compliance"] = cost_policies
             
-            # Determine overall status with improved logic
             status_scores = {
                 "compliant": 3,
                 "checked": 2,
@@ -1505,21 +1436,17 @@ class GCPFinOpsGovernance:
                 "organization_policies": {}
             }
             
-            # Get budget policies
             try:
                 budget_client = BudgetServiceClient(credentials=self.credentials)
                 
-                # Try to get billing account from kwargs or use a default approach
                 gcp_billing_account = kwargs.get('gcp_billing_account')
                 
                 if gcp_billing_account:
-                    # List budgets for the billing account
                     parent = f"billingAccounts/{gcp_billing_account}"
                     request = ListBudgetsRequest(parent=parent, page_size=10)
                     budgets = list(budget_client.list_budgets(request=request))
                     
                     if budgets:
-                        # Extract budget information
                         budget_info = []
                         for budget in budgets:
                             budget_info.append({
@@ -1551,9 +1478,8 @@ class GCPFinOpsGovernance:
                             "message": f"No budgets found for billing account {gcp_billing_account}"
                         }
                 else:
-                    # No billing account provided, return basic info
                     policies["budget_policies"] = {
-                        "budgets_configured": True,  # Assume enabled if we can access the client
+                        "budgets_configured": True,
                         "total_budgets": 0,
                         "message": "Budget client accessible but no billing account specified. Pass 'gcp_billing_account' parameter to get budget details.",
                         "recommendation": "Provide gcp_billing_account parameter to retrieve actual budget information"
@@ -1566,12 +1492,10 @@ class GCPFinOpsGovernance:
                     "message": "Failed to access budget information"
                 }
             
-            # Get quota policies
             try:
                 from google.cloud import orgpolicy_v2
                 org_policy_client = orgpolicy_v2.OrgPolicyClient(credentials=self.credentials)
                 
-                # Check for common cost-related organization policies
                 constraint_names = [
                     "compute.quota.maxCpusPerProject",
                     "compute.quota.maxInstancesPerProject",
@@ -1607,7 +1531,6 @@ class GCPFinOpsGovernance:
                     "message": "Quota policies require Organization Policy API access"
                 }
             
-            # Cost control policies
             policies["cost_control_policies"] = {
                 "auto_shutdown_enabled": False,
                 "idle_resource_cleanup": False,
@@ -1615,7 +1538,6 @@ class GCPFinOpsGovernance:
                 "resource_tagging_required": False
             }
             
-            # Organization-level cost policies
             policies["organization_policies"] = {
                 "cost_center_tagging": False,
                 "budget_approval_required": False,
@@ -1646,6 +1568,7 @@ class GCPFinOpsAnalytics:
         """
         self.project_id = project_id
         self.credentials = service_account.Credentials.from_service_account_file(credentials_path)
+        self.cost_client = GCPCostManagement(project_id, credentials_path)
 
 
     def get_cost_anomalies(
@@ -1684,7 +1607,6 @@ class GCPFinOpsAnalytics:
         model_id = f"{bq_project_id}.{bq_dataset}.cost_anomaly_model"
         client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
 
-        # 1. Train or replace the model
         train_query = f"""
             CREATE OR REPLACE MODEL `{model_id}`
             OPTIONS(
@@ -1708,7 +1630,6 @@ class GCPFinOpsAnalytics:
         except Exception as e:
             return {"error": f"Failed to train BigQuery ML model: {str(e)}"}
 
-        # 2. Detect anomalies
         anomaly_query = f"""
             SELECT
               day,
@@ -1778,28 +1699,23 @@ class GCPFinOpsAnalytics:
 
         client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
         
-        # 1. Always get basic statistics (fast)
         basic_query = f"""
-            WITH daily_costs AS (
                 SELECT 
-                    DATE(usage_start_time) as day,
-                    SUM(cost) as daily_cost
-                FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
-                WHERE usage_start_time >= '{start_date}' AND usage_end_time <= '{end_date}'
-                GROUP BY day
-            )
-            SELECT
-                COUNT(*) as total_days,
+                COUNT(DISTINCT DATE(usage_start_time)) as total_days,
                 AVG(daily_cost) as avg_daily_cost,
                 STDDEV(daily_cost) as cost_stddev,
                 MIN(daily_cost) as min_daily_cost,
                 MAX(daily_cost) as max_daily_cost,
                 SUM(daily_cost) as total_cost_period,
-                COUNT(DISTINCT EXTRACT(DAYOFWEEK FROM day)) as unique_days_of_week,
-                COUNT(DISTINCT service) as unique_services,
-                COUNT(DISTINCT project.id) as unique_projects,
-                COUNT(DISTINCT location.location) as unique_locations
-            FROM daily_costs
+                COUNT(DISTINCT EXTRACT(DAYOFWEEK FROM DATE(usage_start_time))) as unique_days_of_week
+            FROM (
+                SELECT 
+                    usage_start_time,
+                    SUM(cost) as daily_cost
+                FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
+                WHERE usage_start_time >= '{start_date}' AND usage_end_time <= '{end_date}'
+                GROUP BY usage_start_time
+            )
         """
         
         try:
@@ -1813,20 +1729,15 @@ class GCPFinOpsAnalytics:
             max_daily_cost = float(basic_row['max_daily_cost'])
             total_cost_period = float(basic_row['total_cost_period'])
             unique_days_of_week = basic_row['unique_days_of_week']
-            unique_services = basic_row['unique_services']
-            unique_projects = basic_row['unique_projects']
-            unique_locations = basic_row['unique_locations']
             
-            # 2. Decide whether to use ML based on data characteristics
             should_use_ml = (
                 use_ml and 
-                total_days >= 14 and  # Enough data for ML
-                unique_days_of_week >= 5 and  # Has weekly patterns
-                cost_stddev > avg_daily_cost * 0.1  # Has enough variance
+                total_days >= 14 and
+                unique_days_of_week >= 5 and
+                cost_stddev > avg_daily_cost * 0.1
             )
             
             if should_use_ml:
-                # Use ML for waste detection
                 try:
                     model_id = f"{bq_project_id}.{bq_dataset}.cost_efficiency_model"
                     train_query = f"""
@@ -1869,7 +1780,6 @@ class GCPFinOpsAnalytics:
                     method_used = "ML-enhanced"
                     
                 except Exception as e:
-                    # Fallback to manual calculation
                     waste_query = f"""
                         WITH daily_costs AS (
                             SELECT 
@@ -1878,16 +1788,22 @@ class GCPFinOpsAnalytics:
                             FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
                             WHERE usage_start_time >= '{start_date}' AND usage_end_time <= '{end_date}'
                             GROUP BY day
+                        ),
+                        cost_stats AS (
+                            SELECT 
+                                AVG(daily_cost) as avg_cost,
+                                STDDEV(daily_cost) as cost_stddev,
+                                PERCENTILE_CONT(daily_cost, 0.75) as p75_cost
+                            FROM daily_costs
                         )
                         SELECT COUNT(*) as waste_days
-                        FROM daily_costs
-                        WHERE daily_cost > {avg_daily_cost * 1.5}
+                        FROM daily_costs, cost_stats
+                        WHERE daily_cost > (avg_cost + (cost_stddev * 1.5))
                     """
                     waste_job = client.query(waste_query)
                     waste_days = list(waste_job)[0]['waste_days']
                     method_used = "Manual (ML failed)"
             else:
-                # Use manual calculation
                 waste_query = f"""
                     WITH daily_costs AS (
                         SELECT 
@@ -1896,16 +1812,22 @@ class GCPFinOpsAnalytics:
                         FROM `{bq_project_id}.{bq_dataset}.{bq_table}`
                         WHERE usage_start_time >= '{start_date}' AND usage_end_time <= '{end_date}'
                         GROUP BY day
+                    ),
+                    cost_stats AS (
+                        SELECT 
+                            AVG(daily_cost) as avg_cost,
+                            STDDEV(daily_cost) as cost_stddev,
+                            PERCENTILE_CONT(daily_cost, 0.75) as p75_cost
+                        FROM daily_costs
                     )
                     SELECT COUNT(*) as waste_days
-                    FROM daily_costs
-                    WHERE daily_cost > {avg_daily_cost * 1.5}
+                    FROM daily_costs, cost_stats
+                    WHERE daily_cost > (avg_cost + (cost_stddev * 1.5))
                 """
                 waste_job = client.query(waste_query)
                 waste_days = list(waste_job)[0]['waste_days']
                 method_used = "Manual (insufficient data for ML)"
             
-            # 3. Calculate final metrics
             waste_percentage = (waste_days / total_days) if total_days > 0 else 0
             cost_variance = (cost_stddev / avg_daily_cost) if avg_daily_cost > 0 else 0
             efficiency_score = 1 - (waste_percentage + cost_variance * 0.3)
@@ -1959,7 +1881,6 @@ class GCPFinOpsAnalytics:
         from google.cloud import bigquery
         from datetime import datetime, timedelta
 
-        # Set default dates based on report type
         today = datetime.today()
         if not start_date or not end_date:
             if report_type == "monthly":
@@ -1973,14 +1894,13 @@ class GCPFinOpsAnalytics:
                 year_start = today.replace(month=1, day=1)
                 start_date = year_start.strftime("%Y-%m-%d")
                 end_date = today.strftime("%Y-%m-%d")
-            else:  # custom
+            else:
                 start_date = (today - timedelta(days=30)).strftime("%Y-%m-%d")
                 end_date = today.strftime("%Y-%m-%d")
 
         client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
 
         try:
-            # 1. Summary statistics
             summary_query = f"""
                 SELECT
                     COUNT(DISTINCT DATE(usage_start_time)) as total_days,
@@ -1994,7 +1914,6 @@ class GCPFinOpsAnalytics:
             summary_job = client.query(summary_query)
             summary_row = list(summary_job)[0]
 
-            # 2. Cost breakdown by service
             service_query = f"""
                 SELECT
                     service.description,
@@ -2009,7 +1928,6 @@ class GCPFinOpsAnalytics:
             service_job = client.query(service_query)
             service_breakdown = [dict(row) for row in service_job]
 
-            # 3. Cost breakdown by project
             project_query = f"""
                 SELECT
                     project.id,
@@ -2024,7 +1942,6 @@ class GCPFinOpsAnalytics:
             project_job = client.query(project_query)
             project_breakdown = [dict(row) for row in project_job]
 
-            # 4. Cost breakdown by location
             location_query = f"""
                 SELECT
                     COALESCE(CAST(location.location AS STRING), 'UNKNOWN') as location,
@@ -2039,7 +1956,6 @@ class GCPFinOpsAnalytics:
             location_job = client.query(location_query)
             location_breakdown = [dict(row) for row in location_job]
 
-            # 5. Daily cost trends
             daily_query = f"""
                 SELECT
                     DATE(usage_start_time) as date,
@@ -2058,7 +1974,6 @@ class GCPFinOpsAnalytics:
                 for row in daily_job
             ]
 
-            # 6. Top cost drivers (SKUs)
             sku_query = f"""
                 SELECT
                     sku,
@@ -2073,7 +1988,6 @@ class GCPFinOpsAnalytics:
             sku_job = client.query(sku_query)
             top_cost_drivers = [dict(row) for row in sku_job]
 
-            # 7. Cost efficiency metrics
             efficiency_query = f"""
                 WITH daily_costs AS (
                     SELECT 
@@ -2094,7 +2008,6 @@ class GCPFinOpsAnalytics:
             efficiency_job = client.query(efficiency_query)
             efficiency_row = list(efficiency_job)[0]
 
-            # Calculate efficiency score
             avg_daily_cost = float(efficiency_row['avg_daily_cost'])
             cost_stddev = float(efficiency_row['cost_stddev'])
             cost_variance = (cost_stddev / avg_daily_cost) if avg_daily_cost > 0 else 0
@@ -2156,7 +2069,7 @@ class GCPFinOpsAnalytics:
                     "cost_variance_ratio": round(cost_variance, 3),
                     "cost_stddev": round(cost_stddev, 2)
                 },
-                "message": f"Comprehensive cost report generated for {report_type} period."
+                "message": "Comprehensive cost report generated for monthly period."
             }
 
         except Exception as e:
@@ -2169,30 +2082,130 @@ class GCPFinOpsAnalytics:
         bq_table: str,
         start_date: str = None,
         end_date: str = None,
-        forecast_period: int = 12
+        forecast_period: int = 12,
+        use_ai_model: bool = True
     ) -> dict:
         """
-        Forecast future costs using BigQuery ML ARIMA_PLUS model.
+        Get cost forecast using BigQuery ML ARIMA_PLUS model with unified response format.
 
         Args:
-            bq_project_id (str): BigQuery project ID for billing export (required).
-            bq_dataset (str): BigQuery dataset name for billing export (required).
-            bq_table (str): BigQuery table name for billing export (required).
-            start_date (str, optional): Start date for training data (YYYY-MM-DD). Defaults to 90 days ago.
-            end_date (str, optional): End date for training data (YYYY-MM-DD). Defaults to today.
-            forecast_period (int, optional): Number of days to forecast. Defaults to 12.
+            bq_project_id (str): BigQuery project ID
+            bq_dataset (str): BigQuery dataset name
+            bq_table (str): BigQuery table name
+            start_date (str, optional): Start date for historical data
+            end_date (str, optional): End date for historical data
+            forecast_period (int, optional): Number of days to forecast
+            use_ai_model (bool, optional): Whether to use BigQuery ML AI model
 
         Returns:
-            dict: Forecasted cost values, confidence intervals, and model info.
+            dict: Unified forecast response with daily breakdowns
         """
-        from google.cloud import bigquery
         from datetime import datetime, timedelta
 
         today = datetime.today()
-        if not end_date:
-            end_date = today.strftime("%Y-%m-%d")
         if not start_date:
             start_date = (today - timedelta(days=90)).strftime("%Y-%m-%d")
+        if not end_date:
+            end_date = today.strftime("%Y-%m-%d")
+        
+        try:
+            historical_data = self.cost_client.get_cost_data(
+                bq_project_id=bq_project_id,
+                bq_dataset=bq_dataset,
+                bq_table=bq_table,
+                start_date=start_date,
+                end_date=end_date,
+                granularity="Daily"
+            )
+            
+            daily_costs = []
+            total_historical_cost = 0.0
+            
+            if "cost_data" in historical_data:
+                total_cost = sum(item["total_cost"] for item in historical_data["cost_data"])
+                total_historical_cost = total_cost
+                
+                from datetime import datetime
+                start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+                end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+                num_days = (end_dt - start_dt).days + 1
+                
+                daily_cost = total_cost / num_days if num_days > 0 else 0
+                
+                for i in range(num_days):
+                    current_date = start_dt + timedelta(days=i)
+                    daily_costs.append({
+                        "date": current_date.strftime("%Y-%m-%d"),
+                        "cost": daily_cost
+                    })
+            elif "rows" in historical_data:
+                for row in historical_data["rows"]:
+                    if len(row) >= 2:
+                        date_str = row[0]
+                        cost = float(row[1]) if row[1] else 0
+                        
+                        if 'T' in date_str:
+                            date_str = date_str.split('T')[0]
+                        
+                        daily_costs.append({
+                            "date": date_str,
+                            "cost": cost
+                        })
+                        total_historical_cost += cost
+            
+            avg_daily_cost = total_historical_cost / len(daily_costs) if daily_costs else 0
+            
+            forecast_results = []
+            total_forecast_cost = 0.0
+            
+            if use_ai_model:
+                try:
+                    forecast_results = self._generate_bqml_forecast(
+                        bq_project_id, bq_dataset, bq_table, 
+                        start_date, end_date, forecast_period
+                    )
+                    ai_model_used = True
+                except Exception as e:
+                    forecast_results = self._generate_statistical_forecast(
+                        daily_costs, forecast_period, avg_daily_cost
+                    )
+                    ai_model_used = False
+            else:
+                forecast_results = self._generate_statistical_forecast(
+                    daily_costs, forecast_period, avg_daily_cost
+                )
+                ai_model_used = False
+            
+            total_forecast_cost = sum(day["forecast_value"] for day in forecast_results)
+            
+            insights = []
+            if daily_costs:
+                recent_trend = self._calculate_trend(daily_costs[-7:]) if len(daily_costs) >= 7 else 0
+                insights.append(f"Historical average daily cost: {avg_daily_cost:.2f}")
+                insights.append(f"Recent 7-day trend: {recent_trend:.1f}% change")
+                insights.append(f"Forecasted total cost for {forecast_period} days: {total_forecast_cost:.2f}")
+            
+            return {
+                "forecast_period": forecast_period,
+                "start_date": start_date,
+                "end_date": end_date,
+                "total_historical_cost": round(total_historical_cost, 2),
+                "total_forecast_cost": round(total_forecast_cost, 2),
+                "average_daily_cost": round(avg_daily_cost, 2),
+                "forecast_results": forecast_results,
+                "ai_model_used": ai_model_used,
+                "model_accuracy": self._calculate_model_accuracy(daily_costs),
+                "insights": insights,
+                "granularity": "Daily",
+                "message": f"Unified cost forecast generated for {forecast_period} days using {'BigQuery ML' if ai_model_used else 'statistical analysis'}"
+            }
+            
+        except Exception as e:
+            return {"error": f"Failed to generate unified cost forecast: {str(e)}"}
+    
+    def _generate_bqml_forecast(self, bq_project_id, bq_dataset, bq_table, start_date, end_date, forecast_period):
+        """Generate forecast using BigQuery ML ARIMA_PLUS model."""
+        from google.cloud import bigquery
 
         model_id = f"{bq_project_id}.{bq_dataset}.cost_forecast_model"
         client = bigquery.Client(project=bq_project_id, credentials=self.credentials)
@@ -2215,10 +2228,11 @@ class GCPFinOpsAnalytics:
             GROUP BY day
             ORDER BY day
         """
+        
         try:
             client.query(train_query).result()
         except Exception as e:
-            return {"error": f"Failed to train BigQuery ML model: {str(e)}"}
+            raise Exception(f"Failed to train BigQuery ML model: {str(e)}")
 
         forecast_query = f"""
             SELECT
@@ -2231,26 +2245,91 @@ class GCPFinOpsAnalytics:
                 STRUCT({forecast_period} AS horizon, 0.9 AS confidence_level))
             ORDER BY forecast_timestamp
         """
+        
         try:
             forecast_job = client.query(forecast_query)
             forecast_rows = list(forecast_job)
         except Exception as e:
-            return {"error": f"Failed to forecast costs from BigQuery ML model: {str(e)}"}
+            raise Exception(f"Failed to forecast costs from BigQuery ML model: {str(e)}")
 
         forecast_results = [
             {
                 "date": row["forecast_timestamp"].strftime("%Y-%m-%d"),
                 "forecast_value": float(row["forecast_value"]),
                 "lower_bound": float(row["prediction_interval_lower_bound"]),
-                "upper_bound": float(row["prediction_interval_upper_bound"])
+                "upper_bound": float(row["prediction_interval_upper_bound"]),
+                "confidence_level": 0.9
             }
             for row in forecast_rows
         ]
+        
+        return forecast_results
+    
+    def _generate_statistical_forecast(self, daily_costs, forecast_period, avg_daily_cost):
+        """Generate statistical forecast using moving averages and variance."""
+        from datetime import datetime, timedelta
+        import numpy as np
+        
+        if not daily_costs:
+            return []
+        
+        costs = [day["cost"] for day in daily_costs]
+        moving_avg = sum(costs[-7:]) / 7 if len(costs) >= 7 else avg_daily_cost
+        
+        variance = np.var(costs) if len(costs) > 1 else (avg_daily_cost * 0.1) ** 2
+        std_dev = np.sqrt(variance)
+        
+        forecast_results = []
+        last_date = datetime.strptime(daily_costs[-1]["date"], "%Y-%m-%d")
+        
+        for i in range(1, forecast_period + 1):
+            forecast_date = last_date + timedelta(days=i)
+            
+            forecast_value = moving_avg
+            
+            lower_bound = max(0, forecast_value - (1.96 * std_dev))
+            upper_bound = forecast_value + (1.96 * std_dev)
+            
+            forecast_results.append({
+                "date": forecast_date.strftime("%Y-%m-%d"),
+                "forecast_value": round(forecast_value, 2),
+                "lower_bound": round(lower_bound, 2),
+                "upper_bound": round(upper_bound, 2),
+                "confidence_level": 0.95
+            })
+        
+        return forecast_results
+    
+    def _calculate_trend(self, recent_costs):
+        """Calculate trend percentage from recent cost data."""
+        if len(recent_costs) < 2:
+            return 0
+        
+        costs = [day["cost"] for day in recent_costs]
+        first_avg = sum(costs[:len(costs)//2]) / (len(costs)//2)
+        second_avg = sum(costs[len(costs)//2:]) / (len(costs)//2)
+        
+        if first_avg == 0:
+            return 0
+        
+        return ((second_avg - first_avg) / first_avg) * 100
+    
+    def _calculate_model_accuracy(self, daily_costs):
+        """Calculate model accuracy metrics."""
+        import numpy as np
+        
+        if len(daily_costs) < 2:
+            return {"mape": 0, "rmse": 0}
+        
+        costs = [day["cost"] for day in daily_costs]
+        average_daily_cost = sum(costs) / len(costs)
+        
+        mape = sum(abs(cost - average_daily_cost) / average_daily_cost for cost in costs if average_daily_cost > 0) / len(costs) * 100
+        
+        rmse = np.sqrt(sum((cost - average_daily_cost) ** 2 for cost in costs) / len(costs))
 
         return {
-            "forecast_period": forecast_period,
-            "start_date": start_date,
-            "end_date": end_date,
-            "forecast_results": forecast_results,
-            "message": f"Forecast generated for {forecast_period} days using BigQuery ML ARIMA_PLUS model."
+            "mape": round(mape, 2),
+            "rmse": round(rmse, 2),
+            "mean_absolute_error": round(sum(abs(cost - average_daily_cost) for cost in costs) / len(costs), 2)
         }

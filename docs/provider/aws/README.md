@@ -535,6 +535,84 @@ def get_optimization_recommendations(self) -> Dict[str, Any]:
 **Example:**
 ```python
 optimizations = aws.get_optimization_recommendations()
+print(optimizations)
+```
+
+**Sample Response:**
+```json
+{
+    "savings_plans": {
+        "recommendations": [
+            {
+                "SavingsPlansType": "COMPUTE_SP",
+                "UpfrontCost": "0",
+                "EstimatedSavingsAmount": "1200.00",
+                "EstimatedSavingsPercentage": "25.5",
+                "HourlyCommitmentToPurchase": "2",
+                "EstimatedAverageUtilization": "85.2"
+            }
+        ],
+        "total_recommendations": 1,
+        "total_potential_savings": 1200.00
+    },
+    "reservations": {
+        "recommendations": [
+            {
+                "InstanceRecommendation": {
+                    "InstanceRecommendationOption": {
+                        "InstanceType": "m5.large",
+                        "PlatformDifferences": ["Linux/UNIX"],
+                        "PerformanceRisk": "Low",
+                        "Rank": 1,
+                        "SavingsOpportunity": {
+                            "EstimatedMonthlySavingsAmount": "150.00",
+                            "EstimatedMonthlySavingsPercentage": "30.0"
+                        }
+                    }
+                }
+            }
+        ],
+        "total_recommendations": 1,
+        "total_potential_savings": 150.00
+    },
+    "rightsizing": {
+        "recommendations": [
+            {
+                "AccountId": "123456789012",
+                "CurrentInstance": {
+                    "InstanceName": "web-server-1",
+                    "InstanceType": "m5.xlarge",
+                    "MonthlyCost": "200.00"
+                },
+                "RightsizedInstance": {
+                    "InstanceType": "m5.large",
+                    "MonthlyCost": "100.00",
+                    "SavingsPercentage": "50.0"
+                }
+            }
+        ],
+        "total_recommendations": 1,
+        "total_potential_savings": 100.00
+    },
+    "idle_resources": {
+        "idle_instances": [
+            {
+                "InstanceId": "i-1234567890abcdef0",
+                "InstanceType": "t3.micro",
+                "MonthlyCost": "8.50",
+                "IdleDays": 15,
+                "Recommendation": "Stop instance during off-hours"
+            }
+        ],
+        "total_idle_instances": 1,
+        "total_potential_savings": 8.50
+    },
+    "summary": {
+        "total_recommendations": 4,
+        "total_potential_savings": 1458.50,
+        "message": "Comprehensive optimization recommendations generated"
+    }
+}
 ```
 
 ---
@@ -565,6 +643,46 @@ savings_plans = aws.get_savings_plans_recommendations(
     TermInYears="THREE_YEARS",
     PaymentOption="ALL_UPFRONT"
 )
+print(savings_plans)
+```
+
+**Sample Response:**
+```json
+{
+    "SavingsPlansRecommendations": [
+        {
+            "SavingsPlansType": "COMPUTE_SP",
+            "UpfrontCost": "0",
+            "EstimatedSavingsAmount": "1200.00",
+            "EstimatedSavingsPercentage": "25.5",
+            "HourlyCommitmentToPurchase": "2",
+            "EstimatedAverageUtilization": "85.2",
+            "LookbackPeriodInDays": "THIRTY_DAYS",
+            "TermInYears": "ONE_YEAR",
+            "PaymentOption": "NO_UPFRONT"
+        },
+        {
+            "SavingsPlansType": "EC2_INSTANCE_SP",
+            "UpfrontCost": "5000.00",
+            "EstimatedSavingsAmount": "3000.00",
+            "EstimatedSavingsPercentage": "35.0",
+            "HourlyCommitmentToPurchase": "5",
+            "EstimatedAverageUtilization": "90.1",
+            "LookbackPeriodInDays": "SIXTY_DAYS",
+            "TermInYears": "THREE_YEARS",
+            "PaymentOption": "ALL_UPFRONT"
+        }
+    ],
+    "ResponseMetadata": {
+        "RequestId": "abc123-def456-ghi789",
+        "HTTPStatusCode": 200
+    },
+    "summary": {
+        "total_recommendations": 2,
+        "total_potential_savings": 4200.00,
+        "message": "Savings Plans recommendations retrieved successfully"
+    }
+}
 ```
 
 ---
@@ -595,6 +713,68 @@ reservation_recs = aws.get_reservation_purchase_recommendations(
     TermInYears="THREE_YEARS",
     PaymentOption="ALL_UPFRONT"
 )
+print(reservation_recs)
+```
+
+**Sample Response:**
+```json
+{
+    "ReservationsRecommendations": [
+        {
+            "AccountId": "123456789012",
+            "Service": "Amazon Elastic Compute Cloud - Compute",
+            "LookbackPeriodInDays": "THIRTY_DAYS",
+            "TermInYears": "ONE_YEAR",
+            "OfferingClass": "standard",
+            "PaymentOption": "NO_UPFRONT",
+            "InstanceRecommendations": [
+                {
+                    "InstanceRecommendationOption": {
+                        "InstanceType": "m5.large",
+                        "PlatformDifferences": ["Linux/UNIX"],
+                        "PerformanceRisk": "Low",
+                        "Rank": 1,
+                        "SavingsOpportunity": {
+                            "EstimatedMonthlySavingsAmount": "150.00",
+                            "EstimatedMonthlySavingsPercentage": "30.0"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "AccountId": "123456789012",
+            "Service": "Amazon Relational Database Service",
+            "LookbackPeriodInDays": "SIXTY_DAYS",
+            "TermInYears": "THREE_YEARS",
+            "OfferingClass": "standard",
+            "PaymentOption": "ALL_UPFRONT",
+            "InstanceRecommendations": [
+                {
+                    "InstanceRecommendationOption": {
+                        "InstanceType": "db.r5.large",
+                        "PlatformDifferences": [],
+                        "PerformanceRisk": "Low",
+                        "Rank": 1,
+                        "SavingsOpportunity": {
+                            "EstimatedMonthlySavingsAmount": "300.00",
+                            "EstimatedMonthlySavingsPercentage": "40.0"
+                        }
+                    }
+                }
+            ]
+        }
+    ],
+    "ResponseMetadata": {
+        "RequestId": "def456-ghi789-jkl012",
+        "HTTPStatusCode": 200
+    },
+    "summary": {
+        "total_recommendations": 2,
+        "total_potential_savings": 450.00,
+        "message": "Reserved Instance recommendations retrieved successfully"
+    }
+}
 ```
 
 ---
@@ -620,6 +800,78 @@ rightsizing = aws.get_rightsizing_recommendations(
     Service="AmazonEC2",
     Configuration={"RecommendationTarget": "SAME_INSTANCE_FAMILY", "BenefitsConsidered": True}
 )
+print(rightsizing)
+```
+
+**Sample Response:**
+```json
+{
+    "RightsizingRecommendations": [
+        {
+            "AccountId": "123456789012",
+            "CurrentInstance": {
+                "InstanceName": "web-server-1",
+                "InstanceType": "m5.xlarge",
+                "MonthlyCost": "200.00",
+                "Region": "us-east-1",
+                "Platform": "Linux/UNIX"
+            },
+            "RightsizedInstance": {
+                "InstanceType": "m5.large",
+                "MonthlyCost": "100.00",
+                "SavingsPercentage": "50.0",
+                "SavingsAmount": "100.00"
+            },
+            "RecommendationOptions": [
+                {
+                    "InstanceType": "m5.large",
+                    "EstimatedMonthlySavingsAmount": "100.00",
+                    "EstimatedMonthlySavingsPercentage": "50.0",
+                    "PerformanceRisk": "Low"
+                },
+                {
+                    "InstanceType": "m5.2xlarge",
+                    "EstimatedMonthlySavingsAmount": "50.00",
+                    "EstimatedMonthlySavingsPercentage": "25.0",
+                    "PerformanceRisk": "Very Low"
+                }
+            ]
+        },
+        {
+            "AccountId": "123456789012",
+            "CurrentInstance": {
+                "InstanceName": "db-server-1",
+                "InstanceType": "r5.2xlarge",
+                "MonthlyCost": "400.00",
+                "Region": "us-west-2",
+                "Platform": "Linux/UNIX"
+            },
+            "RightsizedInstance": {
+                "InstanceType": "r5.xlarge",
+                "MonthlyCost": "200.00",
+                "SavingsPercentage": "50.0",
+                "SavingsAmount": "200.00"
+            },
+            "RecommendationOptions": [
+                {
+                    "InstanceType": "r5.xlarge",
+                    "EstimatedMonthlySavingsAmount": "200.00",
+                    "EstimatedMonthlySavingsPercentage": "50.0",
+                    "PerformanceRisk": "Medium"
+                }
+            ]
+        }
+    ],
+    "ResponseMetadata": {
+        "RequestId": "ghi789-jkl012-mno345",
+        "HTTPStatusCode": 200
+    },
+    "summary": {
+        "total_recommendations": 2,
+        "total_potential_savings": 300.00,
+        "message": "Rightsizing recommendations retrieved successfully"
+    }
+}
 ```
 
 ---
@@ -641,46 +893,159 @@ def get_idle_resources(self, **kwargs) -> Dict[str, Any]:
 **Example:**
 ```python
 idle_resources = aws.get_idle_resources(Filters=[{"Name": "instance-state-name", "Values": ["running"]}])
+print(idle_resources)
+```
+
+**Sample Response:**
+```json
+{
+    "idle_instances": [
+        {
+            "InstanceId": "i-1234567890abcdef0",
+            "InstanceType": "t3.micro",
+            "InstanceName": "dev-server-1",
+            "MonthlyCost": "8.50",
+            "IdleDays": 15,
+            "Region": "us-east-1",
+            "Platform": "Linux/UNIX",
+            "Recommendation": "Stop instance during off-hours",
+            "PotentialSavings": "4.25"
+        },
+        {
+            "InstanceId": "i-0987654321fedcba0",
+            "InstanceType": "m5.large",
+            "InstanceName": "test-server-1",
+            "MonthlyCost": "75.00",
+            "IdleDays": 7,
+            "Region": "us-west-2",
+            "Platform": "Linux/UNIX",
+            "Recommendation": "Consider terminating if no longer needed",
+            "PotentialSavings": "37.50"
+        }
+    ],
+    "idle_volumes": [
+        {
+            "VolumeId": "vol-1234567890abcdef0",
+            "VolumeType": "gp2",
+            "Size": 100,
+            "MonthlyCost": "10.00",
+            "UnattachedDays": 30,
+            "Region": "us-east-1",
+            "Recommendation": "Delete unattached volume",
+            "PotentialSavings": "10.00"
+        }
+    ],
+    "idle_load_balancers": [
+        {
+            "LoadBalancerArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-lb/1234567890abcdef",
+            "LoadBalancerName": "my-lb",
+            "LoadBalancerType": "application",
+            "MonthlyCost": "20.00",
+            "IdleDays": 10,
+            "Region": "us-east-1",
+            "Recommendation": "Delete if no traffic",
+            "PotentialSavings": "20.00"
+        }
+    ],
+    "summary": {
+        "total_idle_instances": 2,
+        "total_idle_volumes": 1,
+        "total_idle_load_balancers": 1,
+        "total_potential_savings": 71.75,
+        "message": "Idle resources analysis completed"
+    }
+}
 ```
 
 ## 4. Advanced Analytics
 
 ### get_cost_forecast
-Get cost forecast for the specified period (future), with robust defaults.
+Get unified cost forecast for the specified period with AI/ML enhanced predictions and statistical analysis.
 
 **Signature:**
 ```python
 def get_cost_forecast(
     self,
-    TimePeriod: dict = None,
-    Metric: str = "UNBLENDED_COST",
-    Granularity: str = "MONTHLY",
-    Filter: dict = None,
-    BillingViewArn: str = None,
-    PredictionIntervalLevel: int = None,
+    start_date: str = None,
+    end_date: str = None,
+    forecast_period: int = 30,
+    use_ai_model: bool = True,
     **kwargs
 ) -> Dict[str, Any]:
 ```
 
 **Parameters:**
-- `TimePeriod` (dict, optional): {"Start": YYYY-MM-DD, "End": YYYY-MM-DD}. Defaults to today to today+30 days.
-- `Metric` (str, optional): Cost metric. Default: "UNBLENDED_COST".
-- `Granularity` (str, optional): "DAILY" or "MONTHLY". Default: "MONTHLY".
-- `Filter` (dict, optional): Cost Explorer filter.
-- `BillingViewArn` (str, optional): Billing view ARN.
-- `PredictionIntervalLevel` (int, optional): Confidence interval.
+- `start_date` (str, optional): Start date for historical data (YYYY-MM-DD). Defaults to 30 days ago.
+- `end_date` (str, optional): End date for historical data (YYYY-MM-DD). Defaults to today.
+- `forecast_period` (int, optional): Number of days to forecast. Default: 30.
+- `use_ai_model` (bool, optional): Whether to use AI/ML enhanced forecasting. Default: True.
 - `**kwargs`: Any other supported parameters.
 
 **Returns:**
-- Cost forecast data.
+- Dictionary with unified cost forecast data including:
+  - `forecast_period`: Number of days forecasted
+  - `start_date`: Historical data start date
+  - `end_date`: Historical data end date
+  - `total_historical_cost`: Total cost for historical period
+  - `total_forecast_cost`: Total forecasted cost
+  - `average_daily_cost`: Average daily cost
+  - `forecast_results`: Daily forecast values with confidence intervals
+  - `ai_model_used`: Whether AI model was used
+  - `model_accuracy`: Accuracy metrics (MAPE, RMSE, MAE)
+  - `insights`: Cost insights and trends
+  - `granularity`: Data granularity
+  - `message`: Status message
 
 **Example:**
 ```python
 forecast = aws.get_cost_forecast(
-    TimePeriod={"Start": "2024-07-01", "End": "2024-08-01"},
-    Metric="BLENDED_COST",
-    Granularity="DAILY"
+    start_date="2025-05-01",
+    end_date="2025-07-31",
+    forecast_period=30,
+    use_ai_model=True
 )
+print(forecast)
+```
+
+**Sample Response:**
+```json
+{
+    "forecast_period": 30,
+    "start_date": "2025-05-01",
+    "end_date": "2025-07-31",
+    "total_historical_cost": 2.26,
+    "total_forecast_cost": 1.11,
+    "average_daily_cost": 0.02,
+    "forecast_results": [
+        {
+            "date": "2025-07-31",
+            "forecast_value": 0.0,
+            "lower_bound": 0,
+            "upper_bound": 0.01,
+            "confidence_level": 0.8
+        },
+        {
+            "date": "2025-08-01",
+            "forecast_value": 0.02,
+            "lower_bound": 0.01,
+            "upper_bound": 0.02,
+            "confidence_level": 0.8
+        }
+    ],
+    "ai_model_used": true,
+    "model_accuracy": {
+        "mape": 172.62,
+        "rmse": 0.1,
+        "mean_absolute_error": 0.04
+    },
+    "insights": [
+        "Historical average daily cost: $0.02",
+        "Recent 7-day trend: -81.0% change",
+        "Forecasted total cost for 30 days: $1.11"
+    ],
+    "granularity": "DAILY",
+    "message": "Unified cost forecast generated for 30 days using AI model"
+}
 ```
 
 ---
@@ -726,7 +1091,7 @@ anomalies = aws.get_cost_anomalies(
 ---
 
 ### get_cost_efficiency_metrics
-Calculate cost efficiency metrics (cost per user, per transaction, etc.), with robust defaults.
+Calculate cost efficiency metrics with service breakdown and waste analysis.
 
 **Signature:**
 ```python
@@ -734,65 +1099,68 @@ def get_cost_efficiency_metrics(
     self,
     user_count: int = None,
     transaction_count: int = None,
-    TimePeriod: dict = None,
-    Granularity: str = "MONTHLY",
-    Metrics: list = ["UnblendedCost"],
-    GroupBy: list = [{"Type": "DIMENSION", "Key": "SERVICE"}],
-    Filter: dict = None,
-    BillingViewArn: str = None,
-    NextPageToken: str = None,
     **kwargs
 ) -> Dict[str, Any]:
 ```
 
 **Parameters:**
-- `user_count` (int, optional): Number of users for cost per user.
-- `transaction_count` (int, optional): Number of transactions for cost per transaction.
-- `TimePeriod` (dict, optional): {"Start": YYYY-MM-DD, "End": YYYY-MM-DD}. Defaults to current month.
-- `Granularity` (str, optional): "DAILY" or "MONTHLY". Default: "MONTHLY".
-- `Metrics` (list, optional): List of metrics. Default: ["UnblendedCost"].
-- `GroupBy` (list, optional): Grouping. Default: [{"Type": "DIMENSION", "Key": "SERVICE"}].
-- `Filter` (dict, optional): Cost Explorer filter.
-- `BillingViewArn` (str, optional): Billing view ARN.
-- `NextPageToken` (str, optional): For pagination.
+- `user_count` (int, optional): Number of users for cost per user calculation.
+- `transaction_count` (int, optional): Number of transactions for cost per transaction calculation.
 - `**kwargs`: Any other supported parameters.
 
 **Returns:**
-- Cost efficiency metrics.
+- Dictionary with cost efficiency metrics including:
+  - `efficiency_metrics`: Core efficiency data
+  - `total_cost`: Total cost for the period
+  - `cost_by_service`: Service-wise cost breakdown
+  - `waste_estimate`: Estimated waste amount
 
 **Example:**
 ```python
 efficiency = aws.get_cost_efficiency_metrics(
     user_count=100,
-    transaction_count=10000,
-    TimePeriod={"Start": "2024-06-01", "End": "2024-07-01"},
-    Granularity="DAILY"
+    transaction_count=10000
 )
+print(efficiency)
+```
+
+**Sample Response:**
+```json
+{
+    "efficiency_metrics": {
+        "total_cost": 1.52,
+        "cost_by_service": {
+            "AWS Config": 0.05,
+            "AWS Cost Explorer": 1.24,
+            "AWS Key Management Service": 0.0,
+            "EC2 - Other": 0.0,
+            "Amazon Elastic Compute Cloud - Compute": 0.0,
+            "Amazon Simple Notification Service": 0.0,
+            "Amazon Simple Queue Service": 0.0,
+            "Amazon Simple Storage Service": 0.0,
+            "Amazon Virtual Private Cloud": 0.0,
+            "Tax": 0.23
+        },
+        "waste_estimate": 0.0
+    }
+}
 ```
 
 ---
 
-### generate_cost_report
-Generate a comprehensive cost report, robust to missing metrics.
+## Cost Reports
+
+### `generate_cost_report`
+
+Generate comprehensive cost report using AWS Cost Explorer with unified format across all cloud providers.
 
 **Signature:**
 ```python
-def generate_cost_report(
-    self,
-    report_type: str = "monthly",
-    TimePeriod: dict = None,
-    Granularity: str = "MONTHLY",
-    Metrics: list = ["UnblendedCost"],
-    GroupBy: list = [{"Type": "DIMENSION", "Key": "SERVICE"}],
-    Filter: dict = None,
-    BillingViewArn: str = None,
-    NextPageToken: str = None,
-    **kwargs
-) -> Dict[str, Any]:
+def generate_cost_report(self, **kwargs) -> Dict[str, Any]
 ```
 
 **Parameters:**
-- `report_type` (str, optional): Type of report (monthly, quarterly, annual). Default: "monthly".
+- `report_type` (str, optional): Type of report (monthly, quarterly, annual). Default: "monthly"
 - `TimePeriod` (dict, optional): {"Start": YYYY-MM-DD, "End": YYYY-MM-DD}. Defaults to current month.
 - `Granularity` (str, optional): "DAILY" or "MONTHLY". Default: "MONTHLY".
 - `Metrics` (list, optional): List of metrics. Default: ["UnblendedCost"].
@@ -803,38 +1171,178 @@ def generate_cost_report(
 - `**kwargs`: Any other supported parameters.
 
 **Returns:**
-- Cost report data.
+- `Dict[str, Any]`: Unified cost report format with processed data
 
 **Example:**
 ```python
+aws = AWSFinOpsAnalytics(access_key="your_key", secret_key="your_secret", region="us-east-1")
 report = aws.generate_cost_report(
-    report_type="custom",
-    TimePeriod={"Start": "2024-06-01", "End": "2024-07-01"},
+    report_type="monthly",
+    TimePeriod={"Start": "2025-07-01", "End": "2025-07-31"},
     Granularity="DAILY",
-    Metrics=["BlendedCost", "UsageQuantity"],
+    Metrics=["UnblendedCost"],
     GroupBy=[{"Type": "DIMENSION", "Key": "SERVICE"}]
 )
+```
+
+**Sample Response:**
+```json
+{
+    "report_type": "monthly",
+    "period": {
+        "start": "2025-07-01",
+        "end": "2025-07-31"
+    },
+    "generated_at": "2025-07-31T02:10:04.430824",
+    "summary": {
+        "total_cost": 1.918184479,
+        "total_days": 30,
+        "avg_daily_cost": 0.06393948263333332,
+        "min_daily_cost": 5.285e-07,
+        "max_daily_cost": 0.8200059633,
+        "unique_services": 10,
+        "unique_regions": 4
+    },
+    "breakdowns": {
+        "by_service": [
+            {
+                "service": "AWS Config",
+                "total_cost": 0.048,
+                "avg_daily_cost": 0.0016
+            },
+            {
+                "service": "AWS Cost Explorer",
+                "total_cost": 1.58,
+                "avg_daily_cost": 0.05266666666666667
+            }
+        ],
+        "by_region": [
+            {
+                "region": "us-east-1",
+                "total_cost": 1.5800005092,
+                "avg_daily_cost": 0.05266668364
+            }
+        ]
+    },
+    "trends": {
+        "daily_costs": [
+            {
+                "date": "2025-07-01",
+                "daily_cost": 0.2960008597
+            },
+            {
+                "date": "2025-07-02",
+                "daily_cost": 5.285e-07
+            }
+        ]
+    },
+    "cost_drivers": [
+        {
+            "sku": {
+                "id": "AWS Config",
+                "description": "AWS Config"
+            },
+            "service": {
+                "id": "AWS Config",
+                "description": "AWS Config"
+            },
+            "total_cost": 0.048
+        }
+    ],
+    "efficiency_metrics": {
+        "cost_efficiency_score": 0,
+        "cost_variance_ratio": 2.588270123825803,
+        "cost_stddev": 0.1654926526327354
+    },
+    "message": "Comprehensive cost report generated for monthly period."
+}
 ```
 
 ## 5. Governance & Compliance
 
 ### get_governance_policies
-Get AWS cost-related management policies (e.g., Service Control Policies mentioning cost).
+Get AWS governance policies and compliance status for cost management.
 
 **Signature:**
 ```python
-def get_cost_policies(self, **kwargs) -> Dict[str, Any]:
+def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
 ```
 
 **Parameters:**
-- `**kwargs`: Optional filter parameters (see AWS Organizations API).
+- `ResourceId` (str, optional): Resource ID for cost allocation tags.
+- `ConfigRuleName` (str, optional): Config rule name for compliance status.
+- `**kwargs`: Additional parameters for governance policies.
 
 **Returns:**
-- Dictionary with a list of cost-related policies (id, name, description, type, aws_managed, content, arn, tags).
+- Dictionary with unified structure:
+  - `cost_allocation_labels`: Cost allocation tags (unified with GCP)
+  - `policy_compliance`: Compliance status for cost policies (unified with Azure/GCP)
+  - `cost_policies`: Cost-related governance policies
 
 **Example:**
 ```python
-policies = aws.get_cost_policies()
+governance_data = aws.get_governance_policies(
+    ResourceId="arn:aws:ec2:us-east-1:123456789012:instance/i-1234567890abcdef0",
+    ConfigRuleName="cost-optimization-rule"
+)
+```
+
+**Sample Response:**
+```json
+{
+    "cost_allocation_labels": {
+        "tags": [
+            {
+                "key": "Environment",
+                "value": "Production"
+            },
+            {
+                "key": "Project",
+                "value": "FinOps"
+            }
+        ],
+        "total_tags": 2,
+        "message": "Cost allocation tags retrieved from AWS Resource Groups Tagging API"
+    },
+    "policy_compliance": {
+        "compliance_status": {
+            "rule_name": "cost-optimization-rule",
+            "status": "COMPLIANT",
+            "evaluation_results": [
+                {
+                    "resource_id": "i-1234567890abcdef0",
+                    "compliance_type": "NON_COMPLIANT",
+                    "annotation": "Resource missing required cost tags"
+                }
+            ],
+            "total_resources": 1,
+            "compliant_resources": 0,
+            "non_compliant_resources": 1
+        },
+        "message": "Compliance status retrieved from AWS Config API"
+    },
+    "cost_policies": {
+        "policies": [
+            {
+                "id": "p-1234567890abcdef0",
+                "name": "Cost Optimization Policy",
+                "description": "Service Control Policy for cost optimization",
+                "type": "SERVICE_CONTROL_POLICY",
+                "aws_managed": false,
+                "content": "{\"Version\":\"2012-10-17\",\"Statement\":[...]}",
+                "arn": "arn:aws:organizations::123456789012:policy/p-1234567890abcdef0",
+                "tags": [
+                    {
+                        "key": "Purpose",
+                        "value": "Cost Management"
+                    }
+                ]
+            }
+        ],
+        "total_policies": 1,
+        "message": "Cost management policies retrieved from AWS Organizations API"
+    }
+}
 ```
 
 ---

@@ -27,7 +27,7 @@ pip install pycloudmesh
 ```python
 from pycloudmesh import aws_client, azure_client, gcp_client
 
-# AWS Example
+
 aws = aws_client("your_access_key", "your_secret_key", "us-east-1")
 costs = aws.get_cost_data(start_date="2024-01-01", end_date="2024-01-31")
 
@@ -73,7 +73,7 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 
 **Azure:**  
 [ list_budgets ](docs/provider/azure/README.md#list_budgets)  
-[ create_budget ](docs/provider/azure/README.md#create_budget)
+[ create_budget ](docs/provider/azure/README.md#create_budget)  
 [ get_budget_notifications ](docs/provider/azure/README.md#get_budget_notifications)
 
 **GCP:**  
@@ -91,7 +91,7 @@ For detailed documentation, see the [docs/provider](docs/provider/) directory.
 [ get_idle_resources ](docs/provider/aws/README.md#get_idle_resources)
 
 **Azure:**  
-[ get_advisor_recommendations ](docs/provider/azure/README.md#get_advisor_recommendations)
+[ get_advisor_recommendations ](docs/provider/azure/README.md#get_advisor_recommendations)  
 [ get_optimization_recommendations ](docs/provider/azure/README.md#get_optimization_recommendations)  
 [ get_reserved_instance_recommendations ](docs/provider/azure/README.md#get_reserved_instance_recommendations)
 

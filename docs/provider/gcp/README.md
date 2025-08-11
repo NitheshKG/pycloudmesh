@@ -607,7 +607,7 @@ optimizations = gcp.get_optimization_recommendations()
 ## 4. Advanced Analytics
 
 ### get_cost_forecast
-Forecast GCP costs for the specified period using BigQuery ML (ARIMA_PLUS model). This requires your billing export to BigQuery and BigQuery ML permissions.
+Get unified cost forecast for the specified period with AI/ML enhanced predictions using BigQuery ML (ARIMA_PLUS model) and statistical analysis.
 
 **Signature:**
 ```python
@@ -618,7 +618,8 @@ def get_cost_forecast(
     bq_table: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    forecast_period: int = 14
+    forecast_period: int = 30,
+    use_ai_model: bool = True
 ) -> Dict[str, Any]:
 ```
 
@@ -626,12 +627,25 @@ def get_cost_forecast(
 - `bq_project_id` (str): BigQuery project ID for billing export.
 - `bq_dataset` (str): BigQuery dataset name for billing export.
 - `bq_table` (str): BigQuery table name for billing export.
-- `start_date` (str, optional): Historical data start date (YYYY-MM-DD). Defaults to first day of previous month.
-- `end_date` (str, optional): Historical data end date (YYYY-MM-DD). Defaults to today.
-- `forecast_period` (int, optional): Number of days to forecast. Default: 14.
+- `start_date` (str, optional): Start date for historical data (YYYY-MM-DD). Defaults to 90 days ago.
+- `end_date` (str, optional): End date for historical data (YYYY-MM-DD). Defaults to today.
+- `forecast_period` (int, optional): Number of days to forecast. Default: 12.
+- `use_ai_model` (bool, optional): Whether to use BigQuery ML ARIMA_PLUS model. Default: True.
 
 **Returns:**
-- Cost forecast data (requires BigQuery ML setup). Includes prediction intervals.
+- Dictionary with unified cost forecast data including:
+  - `forecast_period`: Number of days forecasted
+  - `start_date`: Historical data start date
+  - `end_date`: Historical data end date
+  - `total_historical_cost`: Total cost for historical period
+  - `total_forecast_cost`: Total forecasted cost
+  - `average_daily_cost`: Average daily cost
+  - `forecast_results`: Daily forecast values with confidence intervals
+  - `ai_model_used`: Whether AI model was used
+  - `model_accuracy`: Accuracy metrics (MAPE, RMSE, MAE)
+  - `insights`: Cost insights and trends
+  - `granularity`: Data granularity
+  - `message`: Status message
 
 **Example:**
 ```python
@@ -639,9 +653,10 @@ forecast = gcp.get_cost_forecast(
     bq_project_id="your-gcp-project",
     bq_dataset="billing_dataset",
     bq_table="gcp_billing_export_resource_v1_XXXXXX",
-    start_date="2025-06-01",
-    end_date="2025-07-04",
-    forecast_period=12
+    start_date="2025-05-01",
+    end_date="2025-07-31",
+    forecast_period=30,
+    use_ai_model=True
 )
 print(forecast)
 ```
@@ -649,27 +664,41 @@ print(forecast)
 **Sample Response:**
 ```json
 {
-   "message": "Forecast generated using BigQuery ML ARIMA_PLUS model.",
-   "period": {
-      "start": "2025-06-01",
-      "end": "2025-07-04"
-   },
-   "forecast_period_days": 12,
-   "forecast": [
+    "forecast_period": 30,
+    "start_date": "2025-05-01",
+    "end_date": "2025-07-31",
+    "total_historical_cost": 417.93,
+    "total_forecast_cost": 107.04,
+    "average_daily_cost": 4.54,
+    "forecast_results": [
       {
-         "date": "2025-07-04",
-         "forecast_cost": 10.49,
-         "prediction_interval_lower_bound": 9.12,
-         "prediction_interval_upper_bound": 11.85
+            "date": "2025-07-30",
+            "forecast_value": 3.060538723422985,
+            "lower_bound": -0.31526241770335384,
+            "upper_bound": 6.436339864549323,
+            "confidence_level": 0.9
       },
       {
-         "date": "2025-07-05",
-         "forecast_cost": 9.67,
-         "prediction_interval_lower_bound": 7.29,
-         "prediction_interval_upper_bound": 12.04
-      },
-      // ... more days ...
-   ]
+            "date": "2025-07-31",
+            "forecast_value": 4.118712071445168,
+            "lower_bound": -0.6553916862102707,
+            "upper_bound": 8.892815829100607,
+            "confidence_level": 0.9
+        }
+    ],
+    "ai_model_used": true,
+    "model_accuracy": {
+        "mape": 0.0,
+        "rmse": 0.0,
+        "mean_absolute_error": 0.0
+    },
+    "insights": [
+        "Historical average daily cost: 4.54",
+        "Recent 7-day trend: 33.3% change",
+        "Forecasted total cost for 30 days: 107.04"
+    ],
+    "granularity": "Daily",
+    "message": "Unified cost forecast generated for 30 days using BigQuery ML"
 }
 ```
 
@@ -767,14 +796,14 @@ def get_cost_efficiency_metrics(
 
 **Example:**
 ```python
-efficiency = gcp.get_cost_efficiency_metrics(
+gcp = GCPFinOpsAnalytics(project_id="your_project", credentials_path="path/to/credentials.json")
+efficiency_metrics = gcp.get_cost_efficiency_metrics(
     bq_project_id="your-gcp-project",
     bq_dataset="billing_dataset",
     bq_table="gcp_billing_export_resource_v1_XXXXXX",
-    start_date="2025-06-01",
-    end_date="2025-07-04"
+    start_date="2025-06-29",
+    end_date="2025-07-29"
 )
-print(efficiency)
 ```
 
 **Sample Response:**
@@ -782,30 +811,33 @@ print(efficiency)
 {
    "efficiency_metrics": {
       "total_days_analyzed": 30,
-      "total_cost_period": 450.25,
-      "avg_daily_cost": 15.01,
-      "min_daily_cost": 8.50,
-      "max_daily_cost": 25.75,
-      "cost_stddev": 4.16,
-      "cost_variance_ratio": 0.28,
-      "cost_efficiency_score": 0.72,
-      "waste_percentage": 15.3,
-      "waste_days": 4,
-      "method_used": "ML-enhanced",
+      "total_cost_period": 417.59,
+      "avg_daily_cost": 0.58,
+      "min_daily_cost": 0.04,
+      "max_daily_cost": 2.19,
+      "cost_stddev": 0.19,
+      "cost_variance_ratio": 0.328,
+      "cost_efficiency_score": 0.902,
+      "waste_percentage": 0.0,
+      "waste_days": 0,
+      "method_used": "Manual (ML failed)",
       "ml_enabled": true
    },
    "period": {
-      "start": "2025-06-01",
-      "end": "2025-07-04"
+      "start": "2025-06-29",
+      "end": "2025-07-29"
    },
-   "message": "Efficiency metrics calculated using ML-enhanced."
+   "message": "Efficiency metrics calculated."
 }
 ```
 
 ---
 
-### generate_cost_report
-Generate comprehensive cost report using BigQuery billing export data with detailed breakdowns and analysis.
+## Cost Reports
+
+### `generate_cost_report`
+
+Generate comprehensive cost report using BigQuery billing export data with unified format across all cloud providers.
 
 **Signature:**
 ```python
@@ -817,31 +849,31 @@ def generate_cost_report(
     report_type: str = "monthly",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None
-) -> Dict[str, Any]:
+) -> Dict[str, Any]
 ```
 
 **Parameters:**
-- `bq_project_id` (str): BigQuery project ID for billing export.
-- `bq_dataset` (str): BigQuery dataset name for billing export.
-- `bq_table` (str): BigQuery table name for billing export.
-- `report_type` (str): Type of report (monthly, quarterly, annual, custom). Default: "monthly".
-- `start_date` (str, optional): Start date for report (YYYY-MM-DD).
-- `end_date` (str, optional): End date for report (YYYY-MM-DD).
+- `bq_project_id` (str, required): BigQuery project ID for billing export
+- `bq_dataset` (str, required): BigQuery dataset name for billing export
+- `bq_table` (str, required): BigQuery table name for billing export
+- `report_type` (str, optional): Type of report (monthly, quarterly, annual, custom). Default: "monthly"
+- `start_date` (str, optional): Start date in YYYY-MM-DD format
+- `end_date` (str, optional): End date in YYYY-MM-DD format
 
 **Returns:**
-- Comprehensive cost report with breakdowns and analysis.
+- `Dict[str, Any]`: Unified cost report format with processed data
 
 **Example:**
 ```python
+gcp = GCPFinOpsAnalytics(project_id="your_project", credentials_path="path/to/credentials.json")
 report = gcp.generate_cost_report(
     bq_project_id="your-gcp-project",
     bq_dataset="billing_dataset",
     bq_table="gcp_billing_export_resource_v1_XXXXXX",
     report_type="monthly",
     start_date="2025-07-01",
-    end_date="2025-07-05"
+    end_date="2025-07-31"
 )
-print(report)
 ```
 
 **Sample Response:**
@@ -850,15 +882,15 @@ print(report)
    "report_type": "monthly",
    "period": {
       "start": "2025-07-01",
-      "end": "2025-07-05"
+        "end": "2025-07-31"
    },
-   "generated_at": "2025-07-05T12:47:55.275555",
+    "generated_at": "2025-07-31T02:10:26.005790",
    "summary": {
-      "total_cost": 26.02,
-      "total_days": 4,
+        "total_cost": 416.83,
+        "total_days": 30,
       "avg_daily_cost": 0.01,
       "min_daily_cost": -0.47,
-      "max_daily_cost": 0.47,
+        "max_daily_cost": 0.54,
       "unique_services": 6,
       "unique_projects": 1,
       "unique_locations": 3
@@ -866,28 +898,38 @@ print(report)
    "breakdowns": {
       "by_service": [
          {
-            "service": "Compute Engine",
-            "total_cost": 11.62,
-            "avg_daily_cost": 0.01
+                "service": "Networking",
+                "total_cost": 161.74,
+                "avg_daily_cost": 0.08
          },
          {
             "service": "VM Manager",
-            "total_cost": 7.2,
+                "total_cost": 160.97,
             "avg_daily_cost": 0.26
+            },
+            {
+                "service": "Compute Engine",
+                "total_cost": 94.12,
+                "avg_daily_cost": 0.0
          }
       ],
       "by_project": [
          {
             "project": "your-gcp-project",
-            "total_cost": 26.02,
+                "total_cost": 416.83,
             "avg_daily_cost": 0.01
          }
       ],
       "by_location": [
          {
             "location": "us-central1",
-            "total_cost": 17.81,
+                "total_cost": 242.46,
             "avg_daily_cost": 0.01
+            },
+            {
+                "location": "us-central1-c",
+                "total_cost": 160.97,
+                "avg_daily_cost": 0.26
          }
       ]
    },
@@ -895,11 +937,11 @@ print(report)
       "daily_costs": [
          {
             "date": "2025-07-01",
-            "daily_cost": 3.01
+                "daily_cost": 3.0135890000000005
          },
          {
             "date": "2025-07-02",
-            "daily_cost": 2.99
+                "daily_cost": 2.9882110000000006
          }
       ]
    },
@@ -913,13 +955,24 @@ print(report)
             "id": "6F81-5844-456A",
             "description": "Compute Engine"
          },
-         "total_cost": 12.6
+            "total_cost": 291.2
+        },
+        {
+            "sku": {
+                "id": "210B-55F7-AA37",
+                "description": "VM Manager Usage (Cloud Ops)"
+            },
+            "service": {
+                "id": "5E18-9A83-2867",
+                "description": "VM Manager"
+            },
+            "total_cost": 160.97
       }
    ],
    "efficiency_metrics": {
-      "cost_efficiency_score": 0.36,
-      "cost_variance_ratio": 0.64,
-      "cost_stddev": 4.16
+        "cost_efficiency_score": 0.723,
+        "cost_variance_ratio": 0.277,
+        "cost_stddev": 3.85
    },
    "message": "Comprehensive cost report generated for monthly period."
 }
@@ -930,7 +983,7 @@ print(report)
 ## 5. Governance & Compliance
 
 ### get_governance_policies
-Get comprehensive governance policies and compliance status for GCP resources, including cost allocation labels, policy compliance, and cost policies.
+Get GCP governance policies and compliance status for cost management.
 
 **Signature:**
 ```python
@@ -947,7 +1000,10 @@ def get_governance_policies(
 - `gcp_billing_account` (str, optional): GCP billing account ID for budget information.
 
 **Returns:**
-- Comprehensive governance data including cost allocation labels, policy compliance, and cost policies.
+- `Dict[str, Any]`: Dictionary with unified structure:
+    - `cost_allocation_labels`: Cost allocation labels (unified with AWS/Azure)
+    - `policy_compliance`: Compliance status for cost policies (unified with AWS/Azure)
+    - `cost_policies`: Cost-related governance policies
 
 **Example:**
 ```python
@@ -957,7 +1013,6 @@ governance_data = gcp.get_governance_policies(
     bq_table="gcp_billing_export_resource_v1_XXXXXX",
     gcp_billing_account="your-billing-account"
 )
-print(governance_data)
 ```
 
 **Sample Response:**
@@ -976,6 +1031,66 @@ print(governance_data)
             {
                "key": "goog-agent-metric-class",
                "value": "cpu"
+                },
+                {
+                    "key": "goog-agent-metric-class",
+                    "value": "disk"
+                },
+                {
+                    "key": "goog-agent-metric-class",
+                    "value": "interface"
+                },
+                {
+                    "key": "goog-agent-metric-class",
+                    "value": "memory"
+                },
+                {
+                    "key": "goog-agent-metric-class",
+                    "value": "network"
+                },
+                {
+                    "key": "goog-agent-metric-class",
+                    "value": "processes"
+                },
+                {
+                    "key": "goog-agent-metric-class",
+                    "value": "swap"
+                },
+                {
+                    "key": "goog-metric-domain",
+                    "value": "agent.googleapis.com"
+                },
+                {
+                    "key": "goog-ops-agent-policy",
+                    "value": "v2-x86-template-1-4-0"
+                },
+                {
+                    "key": "goog-resource-type",
+                    "value": "bigquery_dataset"
+                },
+                {
+                    "key": "goog-resource-type",
+                    "value": "bigquery_dts_config"
+                },
+                {
+                    "key": "goog-resource-type",
+                    "value": "bigquery_project"
+                },
+                {
+                    "key": "goog-resource-type",
+                    "value": "bigquery_resource"
+                },
+                {
+                    "key": "goog-resource-type",
+                    "value": "gce_instance"
+                },
+                {
+                    "key": "goog-resource-type",
+                    "value": "networking.googleapis.com/Location"
+                },
+                {
+                    "key": "goog-resource-type",
+                    "value": "project"
             }
          ],
          "total_unique_labels": 17,
@@ -987,33 +1102,44 @@ print(governance_data)
    "policy_compliance": {
       "compliance_status": {
          "project_compliance": {
-            "total_resources": 5,
+                "total_resources": 1,
             "compliance_checked": true,
             "status": "compliant",
-            "resource_types_found": ["compute.googleapis.com/Instance", "storage.googleapis.com/Bucket"]
+                "resource_types_found": [
+                    "compute.googleapis.com/Instance"
+                ]
+            },
+            "resource_compliance": {},
+            "cost_policy_compliance": {
+                "budget_alerts_enabled": true,
+                "cost_allocation_enabled": true,
+                "resource_quota_enforced": false,
+                "cost_monitoring_enabled": true
          },
          "organization_policy_compliance": {
             "policies_checked": 4,
-            "policies_enforced": 2,
+                "policies_enforced": 0,
             "policy_details": {
                "compute.requireOsLogin": {
-                  "enforced": true,
-                  "policy_exists": true
+                        "enforced": false,
+                        "policy_exists": false
+                    },
+                    "compute.requireShieldedVm": {
+                        "enforced": false,
+                        "policy_exists": false
                },
                "storage.uniformBucketLevelAccess": {
+                        "enforced": false,
+                        "policy_exists": false
+                    },
+                    "compute.vmExternalIpAccess": {
                   "enforced": false,
                   "policy_exists": false
                }
             },
             "status": "checked"
          },
-         "cost_policy_compliance": {
-            "budget_alerts_enabled": true,
-            "cost_allocation_enabled": true,
-            "resource_quota_enforced": false,
-            "cost_monitoring_enabled": true
-         },
-         "overall_status": "compliant"
+            "overall_status": "partial"
       },
       "message": "Policy compliance status retrieved from GCP Asset, Organization Policy, and Budget APIs"
    },
@@ -1021,9 +1147,42 @@ print(governance_data)
       "policies": {
          "budget_policies": {
             "budgets_configured": true,
-            "total_budgets": 1,
-            "budget_details": [
-               {
+                "total_budgets": 0,
+                "message": "Budget client accessible but no billing account specified. Pass 'gcp_billing_account' parameter to get budget details.",
+                "recommendation": "Provide gcp_billing_account parameter to retrieve actual budget information"
+            },
+            "quota_policies": {
+                "compute.quota.maxCpusPerProject": {
+                    "enforced": false,
+                    "policy_exists": false
+                },
+                "compute.quota.maxInstancesPerProject": {
+                    "enforced": false,
+                    "policy_exists": false
+                },
+                "storage.quota.maxBucketsPerProject": {
+                    "enforced": false,
+                    "policy_exists": false
+                }
+            },
+            "cost_control_policies": {
+                "auto_shutdown_enabled": false,
+                "idle_resource_cleanup": false,
+                "cost_alerting": true,
+                "resource_tagging_required": false
+            },
+            "organization_policies": {
+                "cost_center_tagging": false,
+                "budget_approval_required": false,
+                "resource_quota_enforcement": false,
+                "cost_transparency": true
+            }
+        },
+        "total_policies": 4,
+        "message": "Cost management policies retrieved from GCP Organization Policy API"
+    }
+}
+```
                   "name": "pycloudmesh_budget",
                   "amount": {
                      "currency_code": "INR",

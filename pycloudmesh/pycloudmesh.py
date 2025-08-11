@@ -429,7 +429,7 @@ class AWSProvider(CloudProvider):
         parameters and ensures required parameters are present with sensible defaults.
 
         Args:
-            TimePeriod (dict, optional): Time period for forecast. If not provided, defaults to future period.
+            TimePeriod (dict, optional): Time period for forecast. If not provided, start date defaults to 90 days inprior from current date and end date defaults to current date.
             Metric (str, optional): Cost metric for forecasting. Defaults to "UNBLENDED_COST".
             Granularity (str, optional): Data granularity. Defaults to "MONTHLY".
             Filter (dict, optional): Filter criteria for the forecast.
@@ -559,8 +559,8 @@ class AWSProvider(CloudProvider):
 
         Returns:
             Dict[str, Any]: Governance policies and compliance information including:
-                - 'cost_allocation_tags': Cost allocation tags
-                - 'compliance_status': Compliance status for cost policies
+                - 'cost_allocation_labels': Cost allocation tags (unified with GCP)
+                - 'policy_compliance': Compliance status for cost policies (unified with Azure/GCP)
                 - 'cost_policies': Cost-related governance policies
             If the API call fails, returns a dictionary with an "error" key and message.
 
@@ -571,8 +571,8 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return {
-            'cost_allocation_tags': self.governance_client.get_cost_allocation_tags(**kwargs),
-            'compliance_status': self.governance_client.get_compliance_status(**kwargs),
+            'cost_allocation_labels': self.governance_client.get_cost_allocation_tags(**kwargs),
+            'policy_compliance': self.governance_client.get_compliance_status(**kwargs),
             'cost_policies': self.governance_client.get_cost_policies(**kwargs)
         }
     
@@ -1021,6 +1021,58 @@ class AzureProvider(CloudProvider):
         )
     
     def get_cost_forecast(self, scope, **kwargs) -> Dict[str, Any]:
+        """
+        Get cost forecast using Azure Cost Management API.
+        
+        This method uses the Azure Cost Management API to generate cost forecasts
+        for a specified scope and time period. The forecast is based on historical
+        cost data and uses Azure's built-in forecasting algorithms.
+
+        Args:
+            scope (str): Azure scope (subscription, resource group, billing account, etc.)
+                Examples:
+                - Subscription: "/subscriptions/{subscription-id}/"
+                - Resource Group: "/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/"
+                - Billing Account: "/providers/Microsoft.Billing/billingAccounts/{billing-account-id}"
+            start_date (str, optional): Start date for historical data (YYYY-MM-DD). 
+                Defaults to 3 months ago.
+            end_date (str, optional): End date for historical data (YYYY-MM-DD). 
+                Defaults to today.
+            forecast_period (int, optional): Number of periods to forecast. Defaults to 12.
+            api_version (str, optional): API version for the Cost Management API. 
+                Defaults to "2025-03-01".
+            payload (dict, optional): Custom payload for the forecast query. 
+                If not provided, uses default payload structure.
+
+        Returns:
+            Dict[str, Any]: Cost forecast data including:
+                - forecast_periods: List of forecasted periods
+                - forecasted_costs: Predicted costs for each period
+                - confidence_intervals: Upper and lower bounds for predictions
+                - historical_data: Used for forecasting
+                - forecast_accuracy: Model accuracy metrics
+                - insights: Key findings and trends
+
+        Raises:
+            Exception: If the API call fails or returns an error response.
+
+        Example:
+            ```python
+            # Basic forecast for next 12 months
+            forecast = azure.get_cost_forecast(
+                scope="/subscriptions/your-subscription-id/"
+            )
+            
+            # Custom forecast with specific parameters
+            forecast = azure.get_cost_forecast(
+                scope="/subscriptions/your-subscription-id/",
+                start_date="2024-01-01",
+                end_date="2024-12-31",
+                forecast_period=6,
+                api_version="2025-03-01"
+            )
+            ```
+        """
         api_version = kwargs.get('api_version') or kwargs.get('api-version') or "2025-03-01"
         return self.analytics_client.get_cost_forecast(
             scope=scope,
@@ -1114,7 +1166,7 @@ class AzureProvider(CloudProvider):
         Get Azure governance policies and compliance status for cost management.
 
         This method returns a dictionary containing:
-            - cost allocation by tags (costs grouped by supported Azure dimensions and available tags)
+            - cost allocation labels (costs grouped by supported Azure dimensions and available tags)
             - policy compliance status (focused on cost-related policies)
             - cost-related governance policies (filtered for FinOps relevance)
 
@@ -1126,8 +1178,8 @@ class AzureProvider(CloudProvider):
 
         Returns:
             Dict[str, Any]: Dictionary with keys:
-                - 'cost_allocation_by_tags': Cost allocation analysis grouped by tags/dimensions
-                - 'policy_compliance': Compliance status for cost-related policies
+                - 'cost_allocation_labels': Cost allocation analysis grouped by tags/dimensions (unified with AWS/GCP)
+                - 'policy_compliance': Compliance status for cost-related policies (unified with AWS/GCP)
                 - 'cost_policies': List of cost-related governance policies
 
         Example:
@@ -1139,7 +1191,7 @@ class AzureProvider(CloudProvider):
         scope = kwargs.get('scope')
         tag_names = kwargs.get('tag_names')
         return {
-            'cost_allocation_by_tags': self.governance_client.get_costs_by_tags(scope, tag_names),
+            'cost_allocation_labels': self.governance_client.get_costs_by_tags(scope, tag_names),
             'policy_compliance': self.governance_client.get_policy_compliance(scope=scope),
             'cost_policies': self.governance_client.get_cost_policies(scope=scope)
         }
@@ -1724,12 +1776,13 @@ class GCPProvider(CloudProvider):
         parameters and ensures required parameters are present with sensible defaults.
 
         Args:
-            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to first day of current month.
+            start_date (str, optional): Start date in YYYY-MM-DD format. Defaults to 90 days inprior from current date.
             end_date (str, optional): End date in YYYY-MM-DD format. Defaults to today's date.
             forecast_period (int, optional): Number of periods to forecast. Defaults to 12.
             bq_project_id (str): BigQuery project ID for cost data analysis.
             bq_dataset (str): BigQuery dataset containing cost data.
             bq_table (str): BigQuery table containing cost data.
+            use_ai_model (bool, optional): Whether to use BigQuery ML AI model (default: True).
 
         Returns:
             Dict[str, Any]: Cost forecast data from GCP BigQuery ML including:
@@ -1755,7 +1808,8 @@ class GCPProvider(CloudProvider):
             forecast_period=kwargs.get('forecast_period', 12),
             bq_project_id=kwargs.get('bq_project_id'),
             bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table')
+            bq_table=kwargs.get('bq_table'),
+            use_ai_model=kwargs.get('use_ai_model', True)
         )
     
     def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
@@ -1797,7 +1851,7 @@ class GCPProvider(CloudProvider):
             bq_table=kwargs.get('bq_table'),
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            anomaly_prob_threshold=kwargs.get('anomaly_prob_threshold'),
+            anomaly_prob_threshold=kwargs.get('anomaly_prob_threshold', 0.95),
         )
     
     def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
@@ -1840,7 +1894,7 @@ class GCPProvider(CloudProvider):
             bq_table=kwargs.get('bq_table'),
             start_date=kwargs.get('start_date'),
             end_date=kwargs.get('end_date'),
-            use_ml=kwargs.get('use_ml')
+            use_ml=kwargs.get('use_ml', True)
         )
     
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
