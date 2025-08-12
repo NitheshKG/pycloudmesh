@@ -5,7 +5,7 @@ with open("requirements.txt") as f:
 
 setup(
     name="pycloudmesh",
-    version="1.0.3",
+    version="1.0.2",
     author="Nithesh",
     author_email="nitheshkg18@gmail.com",
     description="Unified FinOps and cost analytics toolkit for AWS, Azure, and GCP. Provides programmatic access to cloud cost, budgeting, optimization, and governance APIs.",
