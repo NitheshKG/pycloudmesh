@@ -2,91 +2,32 @@ from typing import Optional, Dict, Any, Union, List
 from functools import lru_cache
 from abc import ABC, abstractmethod
 from pycloudmesh.providers.aws import (
-    AWSBudgetManagement, AWSCostManagement, AWSReservationCost,
-    AWSFinOpsOptimization, AWSFinOpsGovernance, AWSFinOpsAnalytics
+    AWSBudgetManagement,
+    AWSCostManagement,
+    AWSReservationCost,
+    AWSFinOpsOptimization,
+    AWSFinOpsGovernance,
+    AWSFinOpsAnalytics,
 )
 from pycloudmesh.providers.azure import (
-    AzureReservationCost, AzureBudgetManagement, AzureCostManagement,
-    AzureFinOpsOptimization, AzureFinOpsGovernance, AzureFinOpsAnalytics
+    AzureReservationCost,
+    AzureBudgetManagement,
+    AzureCostManagement,
+    AzureFinOpsOptimization,
+    AzureFinOpsGovernance,
+    AzureFinOpsAnalytics,
 )
 from pycloudmesh.providers.gcp import (
-    GCPReservationCost, GCPCostManagement, GCPBudgetManagement,
-    GCPFinOpsOptimization, GCPFinOpsGovernance, GCPFinOpsAnalytics
+    GCPReservationCost,
+    GCPCostManagement,
+    GCPBudgetManagement,
+    GCPFinOpsOptimization,
+    GCPFinOpsGovernance,
+    GCPFinOpsAnalytics,
 )
 
 
-class CloudProvider(ABC):
-    """Abstract base class for cloud providers with comprehensive FinOps features."""
-    
-    # Core FinOps Features
-    @abstractmethod
-    def get_reservation_cost(self) -> Dict[str, Any]:
-        """Get reservation costs."""
-        pass
-    
-    @abstractmethod
-    def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
-        """Get reservation recommendations."""
-        pass
-    
-    @abstractmethod
-    def list_budgets(self, **kwargs) -> Dict[str, Any]:
-        """List budgets."""
-        pass
-    
-    @abstractmethod
-    def get_cost_data(self, **kwargs) -> Dict[str, Any]:
-        """Get cost data for the cloud provider."""
-        pass
-    
-    @abstractmethod
-    def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
-        """Get detailed cost analysis with dimensions."""
-        pass
-    
-    @abstractmethod
-    def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
-        """Get cost trends over time."""
-        pass
-    
-    @abstractmethod
-    def get_resource_costs(self, resource_id: str, **kwargs) -> Dict[str, Any]:
-        """Get costs for a specific resource."""
-        pass
-    
-    # Advanced FinOps Features
-    @abstractmethod
-    def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
-        """Get comprehensive optimization recommendations."""
-        pass
-    
-    @abstractmethod
-    def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
-        """Get cost forecast for the specified period."""
-        pass
-    
-    @abstractmethod
-    def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
-        """Get cost anomalies."""
-        pass
-    
-    @abstractmethod
-    def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
-        """Get cost efficiency metrics."""
-        pass
-    
-    @abstractmethod
-    def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
-        """Generate comprehensive cost report."""
-        pass
-    
-    @abstractmethod
-    def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
-        """Get governance policies and compliance status."""
-        pass
-
-
-class AWSProvider(CloudProvider):
+class AWSProvider:
     def __init__(self, access_key: str, secret_key: str, region: str):
         self.reservation_client = AWSReservationCost(access_key, secret_key, region)
         self.cost_client = AWSCostManagement(access_key, secret_key, region)
@@ -94,7 +35,7 @@ class AWSProvider(CloudProvider):
         self.optimization_client = AWSFinOpsOptimization(access_key, secret_key, region)
         self.governance_client = AWSFinOpsGovernance(access_key, secret_key, region)
         self.analytics_client = AWSFinOpsAnalytics(access_key, secret_key, region)
-    
+
     # Core FinOps Features
     def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
         """
@@ -124,7 +65,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.reservation_client.get_reservation_cost(**kwargs)
-    
+
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
         """
         Get AWS reservation purchase recommendations.
@@ -163,7 +104,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.reservation_client.get_reservation_recommendation(**kwargs)
-    
+
     def get_reservation_coverage(self, **kwargs) -> Dict[str, Any]:
         """
         Get AWS reservation coverage data.
@@ -196,7 +137,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.reservation_client.get_reservation_coverage(**kwargs)
-    
+
     def list_budgets(self, **kwargs) -> Dict[str, Any]:
         """
         List AWS budgets for an account.
@@ -222,11 +163,11 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.budget_client.list_budgets(
-            kwargs.get('aws_account_id'),
-            max_results=kwargs.get('aws_max_results'),
-            next_token=kwargs.get('aws_next_token')
+            kwargs.get("aws_account_id"),
+            max_results=kwargs.get("aws_max_results"),
+            next_token=kwargs.get("aws_next_token"),
         )
-    
+
     def get_cost_data(self, **kwargs) -> Dict[str, Any]:
         """
         Fetch AWS cost data for a given period and dimensions using Cost Explorer.
@@ -260,14 +201,14 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.cost_client.get_aws_cost_data(
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'MONTHLY'),
-            metrics=kwargs.get('metrics'),
-            group_by=kwargs.get('group_by'),
-            filter_=kwargs.get('filter_')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            granularity=kwargs.get("granularity", "MONTHLY"),
+            metrics=kwargs.get("metrics"),
+            group_by=kwargs.get("group_by"),
+            filter_=kwargs.get("filter_"),
         )
-    
+
     def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
         """
         Get detailed cost analysis with insights and breakdowns for AWS.
@@ -302,11 +243,11 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.cost_client.get_aws_cost_analysis(
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            dimensions=kwargs.get('dimensions')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            dimensions=kwargs.get("dimensions"),
         )
-    
+
     def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
         """
         Get detailed cost trends analysis with insights and patterns for AWS.
@@ -350,7 +291,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.cost_client.get_aws_cost_trends(**kwargs)
-    
+
     def get_resource_costs(self, **kwargs) -> Dict[str, Any]:
         """
         Get detailed cost analysis for a specific AWS resource.
@@ -391,12 +332,12 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.cost_client.get_aws_resource_costs(
-            resource_id=kwargs.get('resource_id'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'DAILY')
+            resource_id=kwargs.get("resource_id"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            granularity=kwargs.get("granularity", "DAILY"),
         )
-    
+
     # Advanced FinOps Features
     def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
         """
@@ -420,7 +361,7 @@ class AWSProvider(CloudProvider):
             >>> aws.get_optimization_recommendations()
         """
         return self.optimization_client.get_optimization_recommendations()
-    
+
     def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
         """
         Get cost forecast for the specified period using AWS Cost Explorer.
@@ -448,7 +389,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.get_cost_forecast(**kwargs)
-    
+
     def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
         """
         Get cost anomalies using AWS Cost Explorer.
@@ -475,7 +416,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.get_cost_anomalies(**kwargs)
-    
+
     def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
         """
         Calculate cost efficiency metrics from AWS Cost Explorer.
@@ -511,7 +452,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.get_cost_efficiency_metrics(**kwargs)
-    
+
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
         """
         Generate comprehensive cost report using AWS Cost Explorer.
@@ -546,7 +487,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.generate_cost_report(**kwargs)
-    
+
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
         """
         Get governance policies and compliance status for AWS.
@@ -571,11 +512,13 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return {
-            'cost_allocation_labels': self.governance_client.get_cost_allocation_tags(**kwargs),
-            'policy_compliance': self.governance_client.get_compliance_status(**kwargs),
-            'cost_policies': self.governance_client.get_cost_policies(**kwargs)
+            "cost_allocation_labels": self.governance_client.get_cost_allocation_tags(
+                **kwargs
+            ),
+            "policy_compliance": self.governance_client.get_compliance_status(**kwargs),
+            "cost_policies": self.governance_client.get_cost_policies(**kwargs),
         }
-    
+
     def create_budget(self, **kwargs) -> Dict[str, Any]:
         """
         Create a new AWS budget.
@@ -629,14 +572,14 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.budget_client.create_budget(
-            account_id=kwargs.get('aws_account_id'),
-            budget_name=kwargs.get('budget_name'),
-            budget_amount=kwargs.get('budget_amount'),
-            budget_type=kwargs.get('budget_type', 'COST'),
-            time_unit=kwargs.get('time_unit', 'MONTHLY'),
-            notifications_with_subscribers=kwargs.get('notifications')
+            account_id=kwargs.get("aws_account_id"),
+            budget_name=kwargs.get("budget_name"),
+            budget_amount=kwargs.get("budget_amount"),
+            budget_type=kwargs.get("budget_type", "COST"),
+            time_unit=kwargs.get("time_unit", "MONTHLY"),
+            notifications_with_subscribers=kwargs.get("notifications"),
         )
-    
+
     def get_budget_notifications(self, **kwargs) -> Dict[str, Any]:
         """
         Get notifications for a specific AWS budget.
@@ -657,10 +600,10 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.budget_client.get_budget_notifications(
-            account_id=kwargs.get('aws_account_id'),
-            budget_name=kwargs.get('budget_name')
+            account_id=kwargs.get("aws_account_id"),
+            budget_name=kwargs.get("budget_name"),
         )
-    
+
     def get_savings_plans_recommendations(self, **kwargs) -> Dict[str, Any]:
         """
         Get AWS Savings Plans recommendations.
@@ -689,7 +632,7 @@ class AWSProvider(CloudProvider):
             ... )
         """
         return self.optimization_client._get_savings_plans_recommendations(**kwargs)
-    
+
     def get_rightsizing_recommendations(self, **kwargs) -> Dict[str, Any]:
         """
         Get AWS rightsizing recommendations.
@@ -707,7 +650,7 @@ class AWSProvider(CloudProvider):
             >>> aws.get_rightsizing_recommendations()
         """
         return self.optimization_client._get_rightsizing_recommendations(**kwargs)
-    
+
     def get_idle_resources(self, **kwargs) -> Dict[str, Any]:
         """
         Get AWS idle resource recommendations.
@@ -725,7 +668,7 @@ class AWSProvider(CloudProvider):
             >>> aws.get_idle_resources()
         """
         return self.optimization_client.get_idle_resources(**kwargs)
-    
+
     def get_reservation_purchase_recommendations(self, **kwargs) -> Dict[str, Any]:
         """
         Get AWS Reserved Instance purchase recommendations.
@@ -755,10 +698,12 @@ class AWSProvider(CloudProvider):
             ...     PaymentOption="NO_UPFRONT"
             ... )
         """
-        return self.optimization_client._get_reservation_purchase_recommendations(**kwargs)
+        return self.optimization_client._get_reservation_purchase_recommendations(
+            **kwargs
+        )
 
 
-class AzureProvider(CloudProvider):
+class AzureProvider:
     def __init__(self, subscription_id: str, token: str):
         self.reservation_client = AzureReservationCost(subscription_id, token)
         self.budget_client = AzureBudgetManagement(subscription_id, token)
@@ -766,7 +711,7 @@ class AzureProvider(CloudProvider):
         self.optimization_client = AzureFinOpsOptimization(subscription_id, token)
         self.governance_client = AzureFinOpsGovernance(subscription_id, token)
         self.analytics_client = AzureFinOpsAnalytics(subscription_id, token)
-    
+
     # Core FinOps Features
     def get_reservation_cost(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
@@ -794,25 +739,23 @@ class AzureProvider(CloudProvider):
             >>> azure.get_reservation_cost(
             ...     scope="/subscriptions/your-subscription-id/"
             ... )
-            
+
             >>> # Get reservation costs for a specific date range
             >>> azure.get_reservation_cost(
             ...     scope="/subscriptions/your-subscription-id/",
             ...     start_date="2024-06-01",
             ...     end_date="2024-06-30"
             ... )
-            
+
             >>> # Get reservation costs for a resource group
             >>> azure.get_reservation_cost(
             ...     scope="/subscriptions/your-subscription-id/resourceGroups/your-rg/"
             ... )
         """
         return self.reservation_client.get_reservation_cost(
-            scope,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date')
-            )
-    
+            scope, start_date=kwargs.get("start_date"), end_date=kwargs.get("end_date")
+        )
+
     def get_reservation_recommendation(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         Get Azure reservation recommendations for various services.
@@ -844,27 +787,25 @@ class AzureProvider(CloudProvider):
             >>> recommendations = azure.get_reservation_recommendation(
             ...     scope="/subscriptions/your-subscription-id/"
             ... )
-            
+
             >>> # Filter by resource group
             >>> recommendations = azure.get_reservation_recommendation(
             ...     scope="/subscriptions/your-subscription-id/",
             ...     filter="ResourceGroup eq 'Production'"
             ... )
-            
+
             >>> # Filter by location and term
             >>> recommendations = azure.get_reservation_recommendation(
             ...     scope="/subscriptions/your-subscription-id/",
             ...     filter="Location eq 'eastus' and Term eq 'P1Y'"
             ... )
         """
-        filter_param = kwargs.get('filter')
-        api_version = kwargs.get('api_version', '2024-08-01')
+        filter_param = kwargs.get("filter")
+        api_version = kwargs.get("api_version", "2024-08-01")
         return self.reservation_client.get_reservation_recommendation(
-            scope=scope,
-            api_version=api_version,
-            filter_param=filter_param
+            scope=scope, api_version=api_version, filter_param=filter_param
         )
-    
+
     def get_cost_data(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         Fetch Azure cost data for a given scope (subscription, resource group, management group, or billing account).
@@ -898,14 +839,14 @@ class AzureProvider(CloudProvider):
         """
         return self.cost_client.get_cost_data(
             scope,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'Monthly'),
-            metrics=kwargs.get('metrics'),
-            group_by=kwargs.get('group_by'),
-            filter_=kwargs.get('filter_')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            granularity=kwargs.get("granularity", "Monthly"),
+            metrics=kwargs.get("metrics"),
+            group_by=kwargs.get("group_by"),
+            filter_=kwargs.get("filter_"),
         )
-    
+
     def get_cost_analysis(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         Get detailed cost analysis with dimensions, returning a summary with breakdowns and insights.
@@ -940,11 +881,11 @@ class AzureProvider(CloudProvider):
         """
         return self.cost_client.get_cost_analysis(
             scope,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            dimensions=kwargs.get('dimensions')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            dimensions=kwargs.get("dimensions"),
         )
-    
+
     def get_cost_trends(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         Get detailed cost trends analysis with insights and patterns.
@@ -982,12 +923,14 @@ class AzureProvider(CloudProvider):
         """
         return self.cost_client.get_cost_trends(
             scope,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'Daily')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            granularity=kwargs.get("granularity", "Daily"),
         )
-    
-    def get_resource_costs(self, scope: str, resource_id: str, **kwargs) -> Dict[str, Any]:
+
+    def get_resource_costs(
+        self, scope: str, resource_id: str, **kwargs
+    ) -> Dict[str, Any]:
         """
         Get costs for a specific resource.
 
@@ -1014,16 +957,16 @@ class AzureProvider(CloudProvider):
         return self.cost_client.get_resource_costs(
             scope,
             resource_id,
-            granularity=kwargs.get('granularity'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            metrics=kwargs.get('metrics')
+            granularity=kwargs.get("granularity"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            metrics=kwargs.get("metrics"),
         )
-    
+
     def get_cost_forecast(self, scope, **kwargs) -> Dict[str, Any]:
         """
         Get cost forecast using Azure Cost Management API.
-        
+
         This method uses the Azure Cost Management API to generate cost forecasts
         for a specified scope and time period. The forecast is based on historical
         cost data and uses Azure's built-in forecasting algorithms.
@@ -1034,14 +977,14 @@ class AzureProvider(CloudProvider):
                 - Subscription: "/subscriptions/{subscription-id}/"
                 - Resource Group: "/subscriptions/{subscription-id}/resourceGroups/{resource-group-name}/"
                 - Billing Account: "/providers/Microsoft.Billing/billingAccounts/{billing-account-id}"
-            start_date (str, optional): Start date for historical data (YYYY-MM-DD). 
+            start_date (str, optional): Start date for historical data (YYYY-MM-DD).
                 Defaults to 3 months ago.
-            end_date (str, optional): End date for historical data (YYYY-MM-DD). 
+            end_date (str, optional): End date for historical data (YYYY-MM-DD).
                 Defaults to today.
             forecast_period (int, optional): Number of periods to forecast. Defaults to 12.
-            api_version (str, optional): API version for the Cost Management API. 
+            api_version (str, optional): API version for the Cost Management API.
                 Defaults to "2025-03-01".
-            payload (dict, optional): Custom payload for the forecast query. 
+            payload (dict, optional): Custom payload for the forecast query.
                 If not provided, uses default payload structure.
 
         Returns:
@@ -1062,7 +1005,7 @@ class AzureProvider(CloudProvider):
             forecast = azure.get_cost_forecast(
                 scope="/subscriptions/your-subscription-id/"
             )
-            
+
             # Custom forecast with specific parameters
             forecast = azure.get_cost_forecast(
                 scope="/subscriptions/your-subscription-id/",
@@ -1073,20 +1016,22 @@ class AzureProvider(CloudProvider):
             )
             ```
         """
-        api_version = kwargs.get('api_version') or kwargs.get('api-version') or "2025-03-01"
+        api_version = (
+            kwargs.get("api_version") or kwargs.get("api-version") or "2025-03-01"
+        )
         return self.analytics_client.get_cost_forecast(
             scope=scope,
             api_version=api_version,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            forecast_period=kwargs.get('forecast_period', 12),
-            payload=kwargs.get('payload')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            forecast_period=kwargs.get("forecast_period", 12),
+            payload=kwargs.get("payload"),
         )
-    
+
     def get_cost_anomalies(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         Get cost anomalies using Azure Cost Management query API.
-        
+
         This method uses the Azure Cost Management query API to analyze cost data
         and identify potential anomalies based on cost patterns and trends.
 
@@ -1102,16 +1047,16 @@ class AzureProvider(CloudProvider):
         """
         return self.analytics_client.get_cost_anomalies(
             scope=scope,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            api_version=kwargs.get('api_version', '2023-03-01'),
-            payload=kwargs.get('payload')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            api_version=kwargs.get("api_version", "2023-03-01"),
+            payload=kwargs.get("payload"),
         )
-    
+
     def get_cost_efficiency_metrics(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         Calculate real cost efficiency metrics from Azure Cost Management API.
-        
+
         Args:
             scope (str): Azure scope (subscription, resource group, billing account, etc.)
             start_date (str, optional): Start date for analysis (YYYY-MM-DD). Defaults to first day of current month.
@@ -1119,19 +1064,19 @@ class AzureProvider(CloudProvider):
             user_count (int, optional): Number of users for cost per user calculation
             transaction_count (int, optional): Number of transactions for cost per transaction calculation
             api_version (str, optional): API version for the Cost Management API
-            
+
         Returns:
             Dict[str, Any]: Cost efficiency metrics with detailed breakdown
         """
         return self.analytics_client.get_cost_efficiency_metrics(
             scope=scope,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            user_count=kwargs.get('user_count'),
-            transaction_count=kwargs.get('transaction_count'),
-            api_version=kwargs.get('api_version', '2023-03-01')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            user_count=kwargs.get("user_count"),
+            transaction_count=kwargs.get("transaction_count"),
+            api_version=kwargs.get("api_version", "2023-03-01"),
         )
-    
+
     def generate_cost_report(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         Generate a comprehensive cost report for a given Azure scope.
@@ -1153,14 +1098,14 @@ class AzureProvider(CloudProvider):
         """
         return self.analytics_client.generate_cost_report(
             scope=scope,
-            report_type=kwargs.get('report_type', 'monthly'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            metrics=kwargs.get('metrics'),
-            group_by=kwargs.get('group_by'),
-            filter_=kwargs.get('filter_')
+            report_type=kwargs.get("report_type", "monthly"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            metrics=kwargs.get("metrics"),
+            group_by=kwargs.get("group_by"),
+            filter_=kwargs.get("filter_"),
         )
-    
+
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
         """
         Get Azure governance policies and compliance status for cost management.
@@ -1188,24 +1133,30 @@ class AzureProvider(CloudProvider):
             ...     tag_names=["Environment", "Project"]
             ... )
         """
-        scope = kwargs.get('scope')
-        tag_names = kwargs.get('tag_names')
+        scope = kwargs.get("scope")
+        tag_names = kwargs.get("tag_names")
         return {
-            'cost_allocation_labels': self.governance_client.get_costs_by_tags(scope, tag_names),
-            'policy_compliance': self.governance_client.get_policy_compliance(scope=scope),
-            'cost_policies': self.governance_client.get_cost_policies(scope=scope)
+            "cost_allocation_labels": self.governance_client.get_costs_by_tags(
+                scope, tag_names
+            ),
+            "policy_compliance": self.governance_client.get_policy_compliance(
+                scope=scope
+            ),
+            "cost_policies": self.governance_client.get_cost_policies(scope=scope),
         }
-    
-    def get_costs_by_tags(self, scope: str, tag_names: Optional[List[str]] = None) -> Dict[str, Any]:
+
+    def get_costs_by_tags(
+        self, scope: str, tag_names: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
         """
         Get costs grouped by tags for cost allocation analysis.
-        
+
         If tag_names is not provided, this method will automatically discover
         available tags for the scope and use them for cost allocation.
 
         Args:
             scope (str): Azure scope (subscription, resource group, etc.)
-            tag_names (Optional[List[str]]): List of tag names to group by. 
+            tag_names (Optional[List[str]]): List of tag names to group by.
                 If None, will automatically discover available tags.
 
         Returns:
@@ -1217,14 +1168,14 @@ class AzureProvider(CloudProvider):
             ...     scope="/subscriptions/your-subscription-id/",
             ...     tag_names=["Environment", "Project"]
             ... )
-            
+
             >>> # Auto-discover and use available tags
             >>> azure.get_costs_by_tags(
             ...     scope="/subscriptions/your-subscription-id/"
             ... )
         """
         return self.governance_client.get_costs_by_tags(scope, tag_names)
-    
+
     def get_reservation_order_details(self, **kwargs) -> Dict[str, Any]:
         """
         Get Azure reservation order details.
@@ -1244,12 +1195,12 @@ class AzureProvider(CloudProvider):
             >>> azure.get_reservation_order_details()
             >>> azure.get_reservation_order_details(api_version="2022-11-01")
         """
-        api_version = kwargs.get('api_version', '2022-11-01')
-        return self.reservation_client.get_azure_reservation_order_details(api_version=api_version)
-    
-    def list_budgets(self, 
-                     scope: str,
-                     **kwargs) -> Dict[str, Any]:
+        api_version = kwargs.get("api_version", "2022-11-01")
+        return self.reservation_client.get_azure_reservation_order_details(
+            api_version=api_version
+        )
+
+    def list_budgets(self, scope: str, **kwargs) -> Dict[str, Any]:
         """
         List Azure budgets for a scope.
 
@@ -1271,17 +1222,18 @@ class AzureProvider(CloudProvider):
 
         """
         return self.budget_client.list_budgets(
-            scope,
-            api_version=kwargs.get('api_version', '2024-08-01')
+            scope, api_version=kwargs.get("api_version", "2024-08-01")
         )
-    
-    def create_budget(self, 
-                    budget_name: str,
-                    amount: float,
-                    scope: str,
-                    notifications: List[Dict[str, Any]],
-                    time_grain: str = "Monthly",
-                    **kwargs) -> Dict[str, Any]:
+
+    def create_budget(
+        self,
+        budget_name: str,
+        amount: float,
+        scope: str,
+        notifications: List[Dict[str, Any]],
+        time_grain: str = "Monthly",
+        **kwargs
+    ) -> Dict[str, Any]:
         """
         Create a new Azure budget with notifications and thresholds.
 
@@ -1301,7 +1253,7 @@ class AzureProvider(CloudProvider):
                 - thresholdType (Optional[str]): Type of threshold (default: "Actual")
             time_grain (str): Time grain for the budget (Monthly, Quarterly, Annually)
             **kwargs: Additional parameters including:
-                - start_date (Optional[str]): Start date for the budget in YYYY-MM-DD format. 
+                - start_date (Optional[str]): Start date for the budget in YYYY-MM-DD format.
                   Will be automatically adjusted to the first day of the month if not already.
                 - end_date (Optional[str]): End date for the budget in YYYY-MM-DD format.
                   Defaults to 5 years from start date if not provided.
@@ -1336,15 +1288,14 @@ class AzureProvider(CloudProvider):
             scope,
             notifications,
             time_grain,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            api_version=kwargs.get('api_version', '2024-08-01')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            api_version=kwargs.get("api_version", "2024-08-01"),
         )
-    
-    def get_budget_notifications(self, 
-                   budget_name: str, 
-                   scope: str, 
-                   **kwargs) -> Dict[str, Any]:
+
+    def get_budget_notifications(
+        self, budget_name: str, scope: str, **kwargs
+    ) -> Dict[str, Any]:
         """
         Get notifications for a specific budget by name and scope.
 
@@ -1364,11 +1315,9 @@ class AzureProvider(CloudProvider):
             >>> azure.get_budget_notifications(budget_name="monthly-budget", scope="/subscriptions/your-subscription-id/")
         """
         return self.budget_client.get_budget_notifications(
-            budget_name,
-            scope,
-            api_version=kwargs.get('api_version', '2024-08-01')
+            budget_name, scope, api_version=kwargs.get("api_version", "2024-08-01")
         )
-    
+
     def get_advisor_recommendations(self, **kwargs) -> Dict[str, Any]:
         """
         Get Azure Advisor recommendations for cost optimization.
@@ -1380,13 +1329,14 @@ class AzureProvider(CloudProvider):
         Returns:
             Dict[str, Any]: Advisor recommendations
         """
-        api_version = kwargs.get('api_version') or kwargs.get('api-version') or "2025-01-01"
-        filter_arg = kwargs.get('filter', '')
-        return self.optimization_client.get_advisor_recommendations(
-            api_version=api_version,
-            filter=filter_arg
+        api_version = (
+            kwargs.get("api_version") or kwargs.get("api-version") or "2025-01-01"
         )
-    
+        filter_arg = kwargs.get("filter", "")
+        return self.optimization_client.get_advisor_recommendations(
+            api_version=api_version, filter=filter_arg
+        )
+
     def get_reserved_instance_recommendations(self, scope: str, **kwargs):
         """
         Get Azure Reserved Instance recommendations for a given scope.
@@ -1407,14 +1357,14 @@ class AzureProvider(CloudProvider):
             ...     filter="ResourceGroup eq 'MyResourceGroup'"
             ... )
         """
-        api_version =kwargs.get('api_version') or kwargs.get('api-version') or "2024-08-01"
-        filter_arg = kwargs.get('filter', '')
-        return self.optimization_client.get_reserved_instance_recommendations(
-            scope=scope,
-            api_version=api_version,
-            filter=filter_arg
+        api_version = (
+            kwargs.get("api_version") or kwargs.get("api-version") or "2024-08-01"
         )
-    
+        filter_arg = kwargs.get("filter", "")
+        return self.optimization_client.get_reserved_instance_recommendations(
+            scope=scope, api_version=api_version, filter=filter_arg
+        )
+
     def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
         """
         Get comprehensive optimization recommendations for Azure, including Advisor and Reserved Instance recommendations.
@@ -1441,7 +1391,7 @@ class AzureProvider(CloudProvider):
         return self.optimization_client.get_optimization_recommendations(**kwargs)
 
 
-class GCPProvider(CloudProvider):
+class GCPProvider:
     def __init__(self, project_id: str, credentials_path: str):
         self.reservation_client = GCPReservationCost(project_id, credentials_path)
         self.budget_client = GCPBudgetManagement(project_id, credentials_path)
@@ -1449,7 +1399,7 @@ class GCPProvider(CloudProvider):
         self.optimization_client = GCPFinOpsOptimization(project_id, credentials_path)
         self.governance_client = GCPFinOpsGovernance(project_id, credentials_path)
         self.analytics_client = GCPFinOpsAnalytics(project_id, credentials_path)
-    
+
     # Core FinOps Features
     def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
         """
@@ -1484,13 +1434,13 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.reservation_client.get_reservation_cost(
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
+            bq_project_id=kwargs.get("bq_project_id"),
+            bq_dataset=kwargs.get("bq_dataset"),
+            bq_table=kwargs.get("bq_table"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
         )
-    
+
     def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
         """
         Get GCP reservation purchase recommendations.
@@ -1513,7 +1463,7 @@ class GCPProvider(CloudProvider):
             >>> gcp.get_reservation_recommendation()
         """
         return self.reservation_client.get_reservation_recommendation()
-    
+
     def list_budgets(self, **kwargs) -> Dict[str, Any]:
         """
         List GCP budgets for a billing account.
@@ -1538,10 +1488,10 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.budget_client.list_budgets(
-            billing_account=kwargs.get('gcp_billing_account'),
-            max_results=kwargs.get('gcp_max_results'),
+            billing_account=kwargs.get("gcp_billing_account"),
+            max_results=kwargs.get("gcp_max_results"),
         )
-    
+
     def get_cost_data(self, **kwargs) -> Dict[str, Any]:
         """
         Fetch GCP cost data for a given period and dimensions using BigQuery.
@@ -1575,22 +1525,20 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.cost_client.get_cost_data(
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            granularity=kwargs.get('granularity', 'Monthly'),
-            metrics=kwargs.get('metrics'),
-            group_by=kwargs.get('group_by'),
-            filter_=kwargs.get('filter_'),
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table')
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            granularity=kwargs.get("granularity", "Monthly"),
+            metrics=kwargs.get("metrics"),
+            group_by=kwargs.get("group_by"),
+            filter_=kwargs.get("filter_"),
+            bq_project_id=kwargs.get("bq_project_id"),
+            bq_dataset=kwargs.get("bq_dataset"),
+            bq_table=kwargs.get("bq_table"),
         )
-    
-    def get_cost_analysis(self, 
-                        bq_project_id: str, 
-                        bq_dataset: str, 
-                        bq_table: str,
-                        **kwargs) -> Dict[str, Any]:
+
+    def get_cost_analysis(
+        self, bq_project_id: str, bq_dataset: str, bq_table: str, **kwargs
+    ) -> Dict[str, Any]:
         """
         Get detailed cost analysis with insights and breakdowns for GCP.
 
@@ -1629,15 +1577,13 @@ class GCPProvider(CloudProvider):
             bq_project_id=bq_project_id,
             bq_dataset=bq_dataset,
             bq_table=bq_table,
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
         )
-    
-    def get_cost_trends(self, 
-                        bq_project_id: str, 
-                        bq_dataset: str, 
-                        bq_table: str,
-                        **kwargs) -> Dict[str, Any]:
+
+    def get_cost_trends(
+        self, bq_project_id: str, bq_dataset: str, bq_table: str, **kwargs
+    ) -> Dict[str, Any]:
         """
         Get detailed cost trends analysis with insights and patterns for GCP.
 
@@ -1683,16 +1629,18 @@ class GCPProvider(CloudProvider):
         return self.cost_client.get_cost_trends(
             bq_project_id=bq_project_id,
             bq_dataset=bq_dataset,
-            bq_table=bq_table,            
+            bq_table=bq_table,
             **kwargs
         )
-    
-    def get_resource_costs(self, 
-                           resource_name: str, 
-                           bq_project_id: str, 
-                           bq_dataset: str, 
-                           bq_table: str,
-                           **kwargs) -> Dict[str, Any]:
+
+    def get_resource_costs(
+        self,
+        resource_name: str,
+        bq_project_id: str,
+        bq_dataset: str,
+        bq_table: str,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
         Get detailed cost analysis for a specific GCP resource.
 
@@ -1744,7 +1692,7 @@ class GCPProvider(CloudProvider):
             bq_table=bq_table,
             **kwargs
         )
-    
+
     # Advanced FinOps Features
     def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
         """
@@ -1767,7 +1715,7 @@ class GCPProvider(CloudProvider):
             >>> gcp.get_optimization_recommendations()
         """
         return self.optimization_client.get_optimization_recommendations()
-    
+
     def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
         """
         Get cost forecast for the specified period using GCP BigQuery ML.
@@ -1803,15 +1751,15 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.get_cost_forecast_bqml(
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            forecast_period=kwargs.get('forecast_period', 12),
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table'),
-            use_ai_model=kwargs.get('use_ai_model', True)
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            forecast_period=kwargs.get("forecast_period", 12),
+            bq_project_id=kwargs.get("bq_project_id"),
+            bq_dataset=kwargs.get("bq_dataset"),
+            bq_table=kwargs.get("bq_table"),
+            use_ai_model=kwargs.get("use_ai_model", True),
         )
-    
+
     def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
         """
         Get cost anomalies using GCP BigQuery ML.
@@ -1846,14 +1794,14 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.get_cost_anomalies(
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            anomaly_prob_threshold=kwargs.get('anomaly_prob_threshold', 0.95),
+            bq_project_id=kwargs.get("bq_project_id"),
+            bq_dataset=kwargs.get("bq_dataset"),
+            bq_table=kwargs.get("bq_table"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            anomaly_prob_threshold=kwargs.get("anomaly_prob_threshold", 0.95),
         )
-    
+
     def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
         """
         Calculate cost efficiency metrics from GCP BigQuery.
@@ -1889,14 +1837,14 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.get_cost_efficiency_metrics(
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
-            use_ml=kwargs.get('use_ml', True)
+            bq_project_id=kwargs.get("bq_project_id"),
+            bq_dataset=kwargs.get("bq_dataset"),
+            bq_table=kwargs.get("bq_table"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
+            use_ml=kwargs.get("use_ml", True),
         )
-    
+
     def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
         """
         Generate comprehensive cost report using GCP BigQuery.
@@ -1934,14 +1882,14 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.analytics_client.generate_cost_report(
-            bq_project_id=kwargs.get('bq_project_id'),
-            bq_dataset=kwargs.get('bq_dataset'),
-            bq_table=kwargs.get('bq_table'),
-            report_type=kwargs.get('report_type', 'monthly'),
-            start_date=kwargs.get('start_date'),
-            end_date=kwargs.get('end_date'),
+            bq_project_id=kwargs.get("bq_project_id"),
+            bq_dataset=kwargs.get("bq_dataset"),
+            bq_table=kwargs.get("bq_table"),
+            report_type=kwargs.get("report_type", "monthly"),
+            start_date=kwargs.get("start_date"),
+            end_date=kwargs.get("end_date"),
         )
-    
+
     def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
         """
         Get governance policies and compliance status for GCP.
@@ -1962,11 +1910,13 @@ class GCPProvider(CloudProvider):
             >>> gcp.get_governance_policies()
         """
         return {
-            'cost_allocation_labels': self.governance_client.get_cost_allocation_tags(**kwargs),
-            'policy_compliance': self.governance_client.get_policy_compliance(**kwargs),
-            'cost_policies': self.governance_client.get_cost_policies(**kwargs)
+            "cost_allocation_labels": self.governance_client.get_cost_allocation_tags(
+                **kwargs
+            ),
+            "policy_compliance": self.governance_client.get_policy_compliance(**kwargs),
+            "cost_policies": self.governance_client.get_cost_policies(**kwargs),
         }
-    
+
     def create_budget(self, **kwargs) -> Dict[str, Any]:
         """
         Create a new GCP budget.
@@ -1992,12 +1942,12 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.budget_client.create_budget(
-            billing_account=kwargs.get('billing_account'),
-            budget_name=kwargs.get('budget_name', 'pycloudmesh_budget'),
-            amount=kwargs.get('amount', 1),
-            currency_code=kwargs.get('currency_code', 'USD')
+            billing_account=kwargs.get("billing_account"),
+            budget_name=kwargs.get("budget_name", "pycloudmesh_budget"),
+            amount=kwargs.get("amount", 1),
+            currency_code=kwargs.get("currency_code", "USD"),
         )
-    
+
     def get_budget_notifications(self, **kwargs) -> Dict[str, Any]:
         """
         Get notifications for a specific GCP budget.
@@ -2018,10 +1968,10 @@ class GCPProvider(CloudProvider):
             ... )
         """
         return self.budget_client.get_budget_notifications(
-            billing_account=kwargs.get('billing_account'),
-            budget_display_name=kwargs.get('budget_name')
+            billing_account=kwargs.get("billing_account"),
+            budget_display_name=kwargs.get("budget_name"),
         )
-    
+
     def get_machine_type_recommendations(self) -> Dict[str, Any]:
         """
         Get GCP machine type recommendations.
@@ -2036,7 +1986,7 @@ class GCPProvider(CloudProvider):
             >>> gcp.get_machine_type_recommendations()
         """
         return self.optimization_client.get_machine_type_recommendations()
-    
+
     def get_idle_resource_recommendations(self) -> Dict[str, Any]:
         """
         Get GCP idle resource recommendations.
@@ -2053,114 +2003,16 @@ class GCPProvider(CloudProvider):
         return self.optimization_client.get_idle_resource_recommendations()
 
 
-class CloudMesh:
-    """
-    CloudMesh provides a unified interface for comprehensive FinOps features
-    across AWS, Azure, and GCP.
-    """
-    
-    PROVIDERS = {
-        'aws': AWSProvider,
-        'azure': AzureProvider,
-        'gcp': GCPProvider
-    }
-    
-    def __init__(self, provider: str, **kwargs):
-        """
-        Initializes CloudMesh based on the selected cloud provider.
-
-        AWS requires access_key, secret_key, region
-        Azure requires subscription_id and token
-        GCP requires project_id, credentials_path
-
-        :param provider: Cloud provider ("aws", "azure", or "gcp").
-        :param kwargs: Provider-specific authentication details.
-        :raises ValueError: If provider is not supported or required parameters are missing.
-        """
-        self.provider = provider.lower()
-        
-        if self.provider not in self.PROVIDERS:
-            raise ValueError(f"Unsupported cloud provider: {provider}. Supported providers: {', '.join(self.PROVIDERS.keys())}")
-        
-        try:
-            self._provider = self.PROVIDERS[self.provider](**kwargs)
-        except TypeError as e:
-            raise ValueError(f"Missing required parameters for {provider}: {str(e)}")
-    
-    # Core FinOps Features
-    @lru_cache(maxsize=128)
-    def get_reservation_cost(self, **kwargs) -> Dict[str, Any]:
-        """Fetch reservation cost for the selected cloud provider."""
-        return self._provider.get_reservation_cost(**kwargs)
-    
-    @lru_cache(maxsize=128)
-    def get_reservation_recommendation(self, **kwargs) -> Dict[str, Any]:
-        """Fetch reservation recommendation for the selected cloud provider."""
-        return self._provider.get_reservation_recommendation(**kwargs)
-    
-    def list_budgets(self, **kwargs) -> Dict[str, Any]:
-        """Fetch budget details for the selected cloud provider."""
-        return self._provider.list_budgets(**kwargs)
-    
-    def get_cost_data(self, **kwargs) -> Dict[str, Any]:
-        """Fetch cost data for the selected cloud provider."""
-        return self._provider.get_cost_data(**kwargs)
-    
-    def get_cost_analysis(self, **kwargs) -> Dict[str, Any]:
-        """Fetch detailed cost analysis for the selected cloud provider."""
-        return self._provider.get_cost_analysis(**kwargs)
-    
-    def get_cost_trends(self, **kwargs) -> Dict[str, Any]:
-        """Fetch cost trends for the selected cloud provider."""
-        return self._provider.get_cost_trends(**kwargs)
-    
-    def get_resource_costs(self, resource_id: str, **kwargs) -> Dict[str, Any]:
-        """Fetch costs for a specific resource."""
-        return self._provider.get_resource_costs(resource_id, **kwargs)
-    
-    # Advanced FinOps Features
-    def get_optimization_recommendations(self, **kwargs) -> Dict[str, Any]:
-        """Get comprehensive optimization recommendations."""
-        return self._provider.get_optimization_recommendations(**kwargs)
-    
-    def get_cost_forecast(self, **kwargs) -> Dict[str, Any]:
-        """Get cost forecast for the specified period."""
-        return self._provider.get_cost_forecast(**kwargs)
-    
-    def get_cost_anomalies(self, **kwargs) -> Dict[str, Any]:
-        """Get cost anomalies."""
-        return self._provider.get_cost_anomalies(**kwargs)
-    
-    def get_cost_efficiency_metrics(self, **kwargs) -> Dict[str, Any]:
-        """Get cost efficiency metrics."""
-        return self._provider.get_cost_efficiency_metrics(**kwargs)
-    
-    def generate_cost_report(self, **kwargs) -> Dict[str, Any]:
-        """Generate comprehensive cost report."""
-        return self._provider.generate_cost_report(**kwargs)
-    
-    def get_governance_policies(self, **kwargs) -> Dict[str, Any]:
-        """Get governance policies and compliance status."""
-        return self._provider.get_governance_policies(**kwargs)
-    
-    # Provider-specific methods
-    def get_azure_reservation_order_details(self) -> Dict[str, Any]:
-        """Fetch reservation order details (Only available for Azure)."""
-        if not isinstance(self._provider, AzureProvider):
-            raise AttributeError("get_azure_reservation_order_details() is only available for Azure.")
-        return self._provider.get_reservation_order_details()
-
-
 # Individual Client Factory Functions
 def create_aws_client(access_key: str, secret_key: str, region: str):
     """
     Create an AWS client with all FinOps capabilities.
-    
+
     Args:
         access_key (str): AWS access key ID
         secret_key (str): AWS secret access key
         region (str): AWS region name
-    
+
     Returns:
         AWSProvider: AWS client with comprehensive FinOps features
     """
@@ -2170,11 +2022,11 @@ def create_aws_client(access_key: str, secret_key: str, region: str):
 def create_azure_client(subscription_id: str, token: str):
     """
     Create an Azure client with all FinOps capabilities.
-    
+
     Args:
         subscription_id (str): Azure subscription ID
         token (str): Azure authentication token
-    
+
     Returns:
         AzureProvider: Azure client with comprehensive FinOps features
     """
@@ -2184,11 +2036,11 @@ def create_azure_client(subscription_id: str, token: str):
 def create_gcp_client(project_id: str, credentials_path: str):
     """
     Create a GCP client with all FinOps capabilities.
-    
+
     Args:
         project_id (str): GCP project ID
         credentials_path (str): Path to GCP service account credentials file
-    
+
     Returns:
         GCPProvider: GCP client with comprehensive FinOps features
     """
@@ -2199,7 +2051,7 @@ def create_gcp_client(project_id: str, credentials_path: str):
 def aws_client(access_key: str, secret_key: str, region: str):
     """
     Create an AWS client - alias for create_aws_client.
-    
+
     Example:
         client = aws_client("your_access_key", "your_secret_key", "us-east-1")
         budgets = client.list_budgets(aws_account_id="123456789012")
@@ -2211,7 +2063,7 @@ def aws_client(access_key: str, secret_key: str, region: str):
 def azure_client(subscription_id: str, token: str):
     """
     Create an Azure client - alias for create_azure_client.
-    
+
     Example:
         client = azure_client("your_subscription_id", "your_token")
         budgets = client.list_budgets(azure_scope="subscriptions/your_subscription_id")
@@ -2223,7 +2075,7 @@ def azure_client(subscription_id: str, token: str):
 def gcp_client(project_id: str, credentials_path: str):
     """
     Create a GCP client - alias for create_gcp_client.
-    
+
     Example:
         client = gcp_client("your_project_id", "/path/to/credentials.json")
         budgets = client.list_budgets()
