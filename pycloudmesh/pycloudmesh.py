@@ -1,6 +1,7 @@
 from typing import Optional, Dict, Any, Union, List
 from functools import lru_cache
 from abc import ABC, abstractmethod
+from azure.identity import ClientSecretCredential
 from pycloudmesh.providers.aws import (
     AWSBudgetManagement,
     AWSCostManagement,
@@ -704,13 +705,21 @@ class AWSProvider:
 
 
 class AzureProvider:
-    def __init__(self, subscription_id: str, token: str):
-        self.reservation_client = AzureReservationCost(subscription_id, token)
-        self.budget_client = AzureBudgetManagement(subscription_id, token)
-        self.cost_client = AzureCostManagement(subscription_id, token)
-        self.optimization_client = AzureFinOpsOptimization(subscription_id, token)
-        self.governance_client = AzureFinOpsGovernance(subscription_id, token)
-        self.analytics_client = AzureFinOpsAnalytics(subscription_id, token)
+    def __init__(self, subscription_id: str, tenant_id: str, client_id: str, client_secret: str):
+        # Generate token internally using credentials
+        credential = ClientSecretCredential(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret
+        )
+        token = credential.get_token("https://management.azure.com/.default")
+        
+        self.reservation_client = AzureReservationCost(subscription_id, token.token)
+        self.budget_client = AzureBudgetManagement(subscription_id, token.token)
+        self.cost_client = AzureCostManagement(subscription_id, token.token)
+        self.optimization_client = AzureFinOpsOptimization(subscription_id, token.token)
+        self.governance_client = AzureFinOpsGovernance(subscription_id, token.token)
+        self.analytics_client = AzureFinOpsAnalytics(subscription_id, token.token)
 
     # Core FinOps Features
     def get_reservation_cost(self, scope: str, **kwargs) -> Dict[str, Any]:
@@ -2019,18 +2028,20 @@ def create_aws_client(access_key: str, secret_key: str, region: str):
     return AWSProvider(access_key, secret_key, region)
 
 
-def create_azure_client(subscription_id: str, token: str):
+def create_azure_client(subscription_id: str, tenant_id: str, client_id: str, client_secret: str):
     """
     Create an Azure client with all FinOps capabilities.
 
     Args:
         subscription_id (str): Azure subscription ID
-        token (str): Azure authentication token
+        tenant_id (str): Azure tenant ID
+        client_id (str): Azure client ID
+        client_secret (str): Azure client secret
 
     Returns:
         AzureProvider: Azure client with comprehensive FinOps features
     """
-    return AzureProvider(subscription_id, token)
+    return AzureProvider(subscription_id, tenant_id, client_id, client_secret)
 
 
 def create_gcp_client(project_id: str, credentials_path: str):
@@ -2060,16 +2071,16 @@ def aws_client(access_key: str, secret_key: str, region: str):
     return create_aws_client(access_key, secret_key, region)
 
 
-def azure_client(subscription_id: str, token: str):
+def azure_client(subscription_id: str, tenant_id: str, client_id: str, client_secret: str):
     """
     Create an Azure client - alias for create_azure_client.
 
     Example:
-        client = azure_client("your_subscription_id", "your_token")
-        budgets = client.list_budgets(azure_scope="subscriptions/your_subscription_id")
+        client = azure_client("your_subscription_id", "your_tenant_id", "your_client_id", "your_client_secret")
+        budgets = client.list_budgets(scope="/subscriptions/your_subscription_id")
         optimizations = client.get_optimization_recommendations()
     """
-    return create_azure_client(subscription_id, token)
+    return create_azure_client(subscription_id, tenant_id, client_id, client_secret)
 
 
 def gcp_client(project_id: str, credentials_path: str):

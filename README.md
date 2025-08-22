@@ -1,5 +1,8 @@
 # PyCloudMesh - Comprehensive FinOps Management
 
+[![PyPI version](https://img.shields.io/pypi/v/pycloudmesh)](https://pypi.org/project/pycloudmesh/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 PyCloudMesh is a unified Python library for comprehensive Financial Operations (FinOps) management across AWS, Azure, and GCP. It provides a consistent interface for cost optimization, governance, analytics, and resource management across all major cloud providers.
 
 ## 🌟 Features
@@ -32,7 +35,7 @@ aws = aws_client("your_access_key", "your_secret_key", "us-east-1")
 costs = aws.get_cost_data(start_date="2024-01-01", end_date="2024-01-31")
 
 # Azure Example
-azure = azure_client("your_subscription_id", "your_token")
+azure = azure_client("your_subscription_id", "your_tenant_id", "your_client_id", "your_client_secret")
 analysis = azure.get_cost_analysis("/subscriptions/your-subscription-id/", dimensions=["SERVICE", "REGION"])
 
 # GCP Example
@@ -286,8 +289,8 @@ To use PyCloudMesh with AWS, you'll need to attach the following IAM policies to
 
 #### Azure
 ```python
-# Using service principal token
-azure = azure_client("subscription_id", "access_token")
+# Using service principal creds
+azure = azure_client("subscription_id", "tenant_id", "client_id", "client_secret")
 
 # Or using Azure CLI
 az login

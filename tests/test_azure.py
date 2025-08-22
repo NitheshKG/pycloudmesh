@@ -22,7 +22,9 @@ load_dotenv()
 RESPONSE_STORE = True  # Set to False to disable response storage
 
 SUBSCRIPTION_ID = os.getenv("AZURE_SUBSCRIPTION_ID")
-TOKEN = os.getenv("AZURE_TOKEN")
+TENANT_ID = os.getenv("AZURE_TENANT_ID")
+CLIENT_ID = os.getenv("AZURE_CLIENT_ID")
+CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET")
 
 # Budget config
 BUDGET_NAME = "TestBudget-PyCloudMesh"
@@ -35,7 +37,7 @@ class TestAzureClient(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test class with Azure client initialization."""
-        cls.azure = azure_client(subscription_id=SUBSCRIPTION_ID, token=TOKEN)
+        cls.azure = azure_client(subscription_id=SUBSCRIPTION_ID, tenant_id=TENANT_ID, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
         cls.test_results = {
             "test_suite": "Azure Cloud Tests",
             "timestamp": datetime.datetime.now().isoformat(),
@@ -72,7 +74,7 @@ class TestAzureClient(unittest.TestCase):
         """Test Azure client creation."""
         try:
             # Test with credentials
-            azure = azure_client(subscription_id=SUBSCRIPTION_ID, token=TOKEN)
+            azure = azure_client(subscription_id=SUBSCRIPTION_ID, tenant_id=TENANT_ID, client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
             
             # Verify object properties
             self.assertIsNotNone(azure)
